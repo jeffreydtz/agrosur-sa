@@ -54,16 +54,45 @@ function analizarCambio(estado) {
   return { titulo: "Tu enfoque de cambio", texto };
 }
 
+function analizarCultura(estado) {
+  const integradas = tieneFlag(estado, "tribus:integradas");
+  const separadas = tieneFlag(estado, "tribus:separadas");
+  const proyecto = tieneFlag(estado, "tribus:proyecto");
+  const padrino = tieneFlag(estado, "padrino:si");
+  const relanzada = tieneFlag(estado, "app:relanzada");
+  const enterrada = tieneFlag(estado, "app:enterrada");
+  let texto = "";
+  if (padrino) {
+    texto += `Convertiste a Don Raúl —el ancla cultural más pesada de la casa— en padrino del sistema. Es el movimiento de manual de Schein: el referente que frenaba el cambio pasó a tirar del carro, y los demás lo siguieron. `;
+  }
+  if (integradas) {
+    texto += `Frente al choque de subculturas («dinosaurios» vs. «nintendos»), apostaste a integrarlas con duplas cruzadas y funcionó: cada tribu aprendió el idioma de la otra. La integración cultural no se decreta, se diseña. `;
+  } else if (separadas) {
+    texto += `Ante las dos tribus, elegiste separarlas. Compraste paz a corto plazo al precio de consolidar la grieta: dos subculturas que no se hablan son dos empresas adentro de una (Schein). `;
+  } else if (proyecto) {
+    texto += `Para las dos tribus elegiste un objetivo común —la «cosecha digital»—: una meta superior compartida es un integrador clásico de subculturas, aunque más lento que la integración directa. `;
+  }
+  if (relanzada) {
+    texto += `Y el relanzamiento de AgroSur Móvil con los productores como co-diseñadores es el ejemplo redondo de gestión del cambio (C5): la adopción se construyó con usuarios, no con decretos.`;
+  } else if (enterrada) {
+    texto += `Enterrar AgroSur Móvil fue admitir una verdad incómoda: tecnología sin gestión del cambio es gasto, no inversión. Honesto, pero dejaste la digitalización sin su herramienta insignia.`;
+  }
+  if (!texto) {
+    texto = `En el frente cultural fuiste con lo justo: ni grandes alianzas con los referentes ni grandes rupturas. La cultura te toleró, pero no te empujó.`;
+  }
+  return { titulo: "Cultura y subculturas", texto };
+}
+
 function analizarDecisiones(estado) {
-  // estilo en R8
-  const r8 = estado.log.find((l) => l.ronda === 8);
+  // estilo en la denuncia de Don Ernesto
+  const denuncia = estado.log.find((l) => l.cartaId === "denuncia");
   const culpable = tieneFlag(estado, "culpable:si");
   const celulas = tieneFlag(estado, "celulas:si");
   let texto = "";
-  if (r8) {
-    if (r8.opcionId === "A") {
+  if (denuncia) {
+    if (denuncia.opcionId === "A") {
       texto += `Frente a la denuncia de Don Ernesto resolviste de forma autocrática: rápido, pero a costa de legitimidad. El estilo autocrático cierra el tema sin resolver la causa raíz; el síntoma vuelve. `;
-    } else if (r8.opcionId === "B") {
+    } else if (denuncia.opcionId === "B") {
       texto += `Usaste un estilo consultivo con los 5 Porqués: fuiste a la causa raíz en vez de quedarte en el síntoma (C8). Es la diferencia entre apagar el incendio y arreglar la instalación eléctrica. `;
     } else {
       texto += `Elegiste un estilo participativo: equipo y cliente resolviendo juntos. Más lento, pero construye confianza y aprendizaje organizacional. `;
@@ -73,7 +102,7 @@ function analizarDecisiones(estado) {
     texto += `En estructura, te animaste a las células transversales: rompiste los silos funcionales y pusiste el proceso por encima del organigrama (C6). `;
   }
   if (culpable) {
-    texto += `Cuidado con un patrón que apareció: buscaste un culpable individual frente a un error que era sistémico. En las organizaciones, casi ningún problema serio es culpa de una sola persona; es el sistema el que falla (C1). Buscar culpables baja la motivación y esconde la causa real. `;
+    texto += `Cuidado con un patrón que apareció: buscaste un culpable individual frente a un error que era sistémico. Y lo viste volver: cuando estalló la denuncia de Don Ernesto, nadie te había avisado a tiempo — el miedo a la sanción esconde los errores, no los arregla (C1, C8). `;
   }
   if (!texto) texto = `Tus decisiones operativas fueron equilibradas, sin un patrón dominante claro.`;
   return { titulo: "Tu estilo de decisión", texto };
@@ -113,6 +142,22 @@ function veredictoFinal(estado, final, valor) {
   return { titulo: "Veredicto del Consultor", texto };
 }
 
+function fichaPartida(estado) {
+  const criticos = estado.log.filter((l) => l.dado && l.dado.critico).length;
+  const pifias = estado.log.filter((l) => l.dado && l.dado.pifia).length;
+  const misiones = Object.keys(estado.misiones).length;
+  const partes = [];
+  if (criticos) partes.push(`${criticos} crítico${criticos > 1 ? "s" : ""} ★`);
+  if (pifias) partes.push(`${pifias} pifia${pifias > 1 ? "s" : ""} ☠`);
+  if (estado.mejorRacha >= 2) partes.push(`racha máxima 🔥x${estado.mejorRacha}`);
+  partes.push(`${misiones}/2 misiones del arquetipo`);
+  partes.push(`${estado.puntaje} puntos de gestión`);
+  return {
+    titulo: "Ficha de la partida",
+    texto: `Para el anecdotario: ${partes.join(" · ")}. Los números cuentan la gestión; las anécdotas, el viaje.`,
+  };
+}
+
 // Genera el informe completo
 export function generarInforme(estado) {
   const { final, valor } = calcularFinal(estado);
@@ -129,13 +174,16 @@ export function generarInforme(estado) {
     secciones.push(analizarResistencia(estado));
     secciones.push(analizarCambio(estado));
     secciones.push(veredictoFinal(estado, final, valor));
+    secciones.push(fichaPartida(estado));
     return { final, valor, secciones };
   }
 
   secciones.push(analizarEstrategia(estado));
   secciones.push(analizarCambio(estado));
+  secciones.push(analizarCultura(estado));
   secciones.push(analizarResistencia(estado));
   secciones.push(analizarDecisiones(estado));
   secciones.push(veredictoFinal(estado, final, valor));
+  secciones.push(fichaPartida(estado));
   return { final, valor, secciones };
 }

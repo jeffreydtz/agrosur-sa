@@ -4,6 +4,8 @@
 import { useState, useEffect, useRef } from "react";
 import { INDICADORES } from "../data.js";
 import { estadoColor, umbralDado } from "../engine.js";
+import { sfx } from "../sound.js";
+import { RachaChip } from "./juice.jsx";
 
 // --- Chip de efecto (flecha) ---
 export function Chip({ k, v }) {
@@ -27,8 +29,8 @@ export function Efectos({ ef }) {
   return <span className="efectos">{chips.map((k) => <Chip key={k} k={k} v={ef[k]} />)}</span>;
 }
 
-// --- Una barra de indicador ---
-export function Barra({ k, valor, animar }) {
+// --- Una barra de indicador (con delta flotante) ---
+export function Barra({ k, valor, delta, seq }) {
   const ind = INDICADORES[k];
   const estado = estadoColor(valor);
   const fillColor = estado === "verde" ? "#5a9e3f" : estado === "ambar" ? "#d9a521" : "#cf4631";
@@ -37,11 +39,18 @@ export function Barra({ k, valor, animar }) {
       <div className="barra-top">
         <span className="barra-emoji">{ind.emoji}</span>
         <span className="barra-nombre">{ind.nombre}</span>
-        <span className="barra-num" style={{ color: fillColor }}>{valor}</span>
+        <span className="barra-num" style={{ color: fillColor }}>
+          {valor}
+          {delta != null && delta !== 0 && (
+            <span key={seq} className={"barra-float " + (delta > 0 ? "float-up" : "float-down")}>
+              {delta > 0 ? "+" : "−"}{Math.abs(delta)}
+            </span>
+          )}
+        </span>
       </div>
       <div className="barra-track">
         <div
-          className={"barra-fill " + (animar ? "barra-anim" : "")}
+          className={"barra-fill " + (delta != null && delta !== 0 ? (delta > 0 ? "fill-flash-up" : "fill-flash-down") : "")}
           style={{ width: valor + "%", background: fillColor }}
         />
       </div>
@@ -50,7 +59,9 @@ export function Barra({ k, valor, animar }) {
 }
 
 // --- Tablero superior ---
-export function Tablero({ estado, ronda, totalRondas, etiqueta }) {
+export function Tablero({ estado, ronda, totalRondas, etiqueta, fx }) {
+  const deltas = (fx && fx.deltas) || {};
+  const seq = fx ? fx.seq : 0;
   return (
     <div className="tablero">
       <div className="tablero-head">
@@ -61,46 +72,76 @@ export function Tablero({ estado, ronda, totalRondas, etiqueta }) {
             <div className="tablero-arq">{etiqueta || estado.arqNombre}</div>
           </div>
         </div>
+        <RachaChip racha={estado.racha} />
+        <div className="tablero-pts" title="Puntaje de la partida">
+          <span className="pts-label">PTS</span>
+          <span className="pts-num" key={estado.puntaje}>{estado.puntaje}</span>
+        </div>
         <div className="tablero-ronda">
           <span className="ronda-label">Ronda</span>
           <span className="ronda-num">{ronda}<span className="ronda-tot">/{totalRondas}</span></span>
         </div>
       </div>
       <div className="tablero-barras">
-        <Barra k="caja" valor={estado.caja} animar />
-        <Barra k="confianza" valor={estado.confianza} animar />
-        <Barra k="adopcion" valor={estado.adopcion} animar />
-        <Barra k="motivacion" valor={estado.motivacion} animar />
+        <Barra k="caja" valor={estado.caja} delta={deltas.caja} seq={seq} />
+        <Barra k="confianza" valor={estado.confianza} delta={deltas.confianza} seq={seq} />
+        <Barra k="adopcion" valor={estado.adopcion} delta={deltas.adopcion} seq={seq} />
+        <Barra k="motivacion" valor={estado.motivacion} delta={deltas.motivacion} seq={seq} />
       </div>
     </div>
   );
 }
 
-// --- Dado d20 ---
-export function Dado({ rolling, valor, umbral, exito, onDone }) {
+// --- Dado d20 (rueda con desaceleración, pausa dramática y crits) ---
+export function Dado({ rolling, valor, umbral, exito, critico, pifia, onDone }) {
   const [cara, setCara] = useState(valor || 1);
-  const intervalRef = useRef(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  const settleRef = useRef(null);
 
   useEffect(() => {
-    if (rolling) {
-      intervalRef.current = setInterval(() => {
-        setCara(1 + Math.floor(Math.random() * 20));
-      }, 70);
-      const t = setTimeout(() => {
-        clearInterval(intervalRef.current);
-        setCara(valor);
-        if (onDone) onDone();
-      }, 1300);
-      return () => { clearInterval(intervalRef.current); clearTimeout(t); };
-    } else {
+    if (!rolling) {
       setCara(valor || 1);
+      return;
     }
+    let cancelado = false;
+    let timer = null;
+    let delay = 70;
+    let i = 0;
+    const settle = () => {
+      if (cancelado) return;
+      cancelado = true;
+      clearTimeout(timer);
+      setCara(valor);
+      if (onDoneRef.current) onDoneRef.current();
+    };
+    settleRef.current = settle;
+    const tick = () => {
+      if (cancelado) return;
+      setCara(1 + Math.floor(Math.random() * 20));
+      sfx.diceTick(i++);
+      delay *= 1.14;
+      if (delay < 250) timer = setTimeout(tick, delay);
+      else timer = setTimeout(settle, 430); // pausa dramática antes de revelar
+    };
+    timer = setTimeout(tick, delay);
+    return () => { cancelado = true; clearTimeout(timer); };
   }, [rolling, valor]);
 
-  const estadoClase = rolling ? "dado-rolling" : (exito === true ? "dado-exito" : exito === false ? "dado-fracaso" : "");
+  const estadoClase = rolling
+    ? "dado-rolling"
+    : critico ? "dado-critico"
+    : pifia ? "dado-pifia"
+    : exito === true ? "dado-exito"
+    : exito === false ? "dado-fracaso" : "";
+
   return (
     <div className="dado-wrap">
-      <div className={"dado " + estadoClase}>
+      <div
+        className={"dado " + estadoClase}
+        onClick={() => rolling && settleRef.current && settleRef.current()}
+        title={rolling ? "Tocá para apurar el dado" : undefined}
+      >
         <svg viewBox="0 0 100 100" className="dado-svg" aria-hidden="true">
           <polygon points="50,4 92,28 92,72 50,96 8,72 8,28" />
           <polygon className="dado-inner" points="50,18 78,34 78,66 50,82 22,66 22,34" />
@@ -108,12 +149,13 @@ export function Dado({ rolling, valor, umbral, exito, onDone }) {
         <span className="dado-num">{cara}</span>
       </div>
       {!rolling && exito != null && (
-        <div className={"dado-result " + (exito ? "txt-exito" : "txt-fracaso")}>
-          {exito ? "✓ ÉXITO" : "✗ FRACASO"} <span className="dado-tirada">({cara} vs {umbral}+)</span>
+        <div className={"dado-result " + (critico ? "txt-critico" : pifia ? "txt-pifia" : exito ? "txt-exito" : "txt-fracaso")}>
+          {critico ? "★ ¡CRÍTICO!" : pifia ? "☠ ¡PIFIA!" : exito ? "✓ ÉXITO" : "✗ FRACASO"}{" "}
+          <span className="dado-tirada">({cara} vs {umbral}+)</span>
         </div>
       )}
       {rolling && umbral && (
-        <div className="dado-objetivo">Necesitás {umbral}+</div>
+        <div className="dado-objetivo">Necesitás {umbral}+ · con 20, crítico ★</div>
       )}
     </div>
   );
@@ -122,9 +164,10 @@ export function Dado({ rolling, valor, umbral, exito, onDone }) {
 // --- Botón de opción ---
 export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }) {
   const esDado = !!opcion.dado;
-  const umbral = esDado ? umbralDado(estado, opcion.rel) : null;
+  const umbral = esDado ? umbralDado(estado, opcion.rel, opcion.umbralMod || 0) : null;
   const enRojo = esDado && opcion.rel && estado[opcion.rel] < 30;
   const indRel = opcion.rel ? INDICADORES[opcion.rel] : null;
+  const rachaEnJuego = esDado && estado.racha >= 3;
 
   return (
     <button
@@ -152,6 +195,12 @@ export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }
             {enRojo
               ? <span className="dado-warning">⚠️ {indRel.nombre} en rojo: necesitás 15+</span>
               : <span className="dado-normal">Éxito con {umbral}+</span>}
+            {opcion.umbralMod ? (
+              <span className={opcion.umbralMod > 0 ? "dado-warning" : "dado-bonus"}>
+                {opcion.umbralMod > 0 ? `🔁 +${opcion.umbralMod} por consecuencia` : `🤝 ${opcion.umbralMod} por tus lazos`}
+              </span>
+            ) : null}
+            {rachaEnJuego && <span className="dado-racha-tag">🔥 Racha en juego</span>}
           </div>
           <div className="rama rama-exito">
             <span className="rama-label">Éxito</span><Efectos ef={opcion.dado.exito.ef} />

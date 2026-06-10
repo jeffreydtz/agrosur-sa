@@ -2,12 +2,13 @@
 // screens2.jsx — Final, Informe del Consultor, Posiciones
 // ============================================================
 import { INDICADORES } from "../data.js";
-import { calcularFinal, valorEmpresa } from "../engine.js";
 import { generarInforme } from "../consultor.js";
+import { sfx } from "../sound.js";
+import { Tally } from "./juice.jsx";
 
-// --- Final ---
-export function FinalScreen({ estado, onVerInforme }) {
-  const { final, valor } = calcularFinal(estado);
+// --- Final (con conteo de puntaje, récord y logros nuevos) ---
+export function FinalScreen({ jugador, resumen, onVerInforme }) {
+  const { estado, final, valor, puntajeTotal, desglose } = jugador;
   const orden = ["caja", "confianza", "adopcion", "motivacion"];
   return (
     <div className="pantalla final-screen" style={{ "--final-c": final.color }}>
@@ -37,7 +38,25 @@ export function FinalScreen({ estado, onVerInforme }) {
           })}
         </div>
 
-        <button className="btn btn-grande" onClick={onVerInforme}>📋 Leer el Informe del Consultor ▸</button>
+        <Tally desglose={desglose} total={puntajeTotal} nuevoRecord={resumen && resumen.nuevoRecord} />
+
+        {resumen && resumen.logros.length > 0 && (
+          <div className="logros-reel">
+            {resumen.logros.map((l) => (
+              <div key={l.id} className="logro-item">
+                <span className="logro-emoji">{l.emoji}</span>
+                <div>
+                  <div className="logro-nombre">🏆 {l.nombre}</div>
+                  <div className="logro-desc">{l.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button className="btn btn-grande" onClick={() => { sfx.click(); onVerInforme(); }}>
+          📋 Leer el Informe del Consultor ▸
+        </button>
       </div>
     </div>
   );
@@ -73,8 +92,8 @@ export function InformeScreen({ estado, onReiniciar, ctaTexto, onCta }) {
         <div className="informe-firma">— El Consultor · AgroSur S.A.</div>
 
         <div className="informe-acciones">
-          {ctaTexto && <button className="btn btn-grande" onClick={onCta}>{ctaTexto}</button>}
-          <button className="btn btn-ghost" onClick={onReiniciar}>↺ Volver al inicio</button>
+          {ctaTexto && <button className="btn btn-grande" onClick={() => { sfx.click(); onCta(); }}>{ctaTexto}</button>}
+          <button className="btn btn-ghost" onClick={() => { sfx.click(); onReiniciar(); }}>↺ Volver al inicio</button>
         </div>
       </div>
     </div>
@@ -84,7 +103,7 @@ export function InformeScreen({ estado, onReiniciar, ctaTexto, onCta }) {
 // --- Tabla de posiciones (multijugador) ---
 export function Posiciones({ jugadores, onReiniciar, onVerInforme }) {
   const ranking = jugadores
-    .map((j, idx) => ({ ...j, idx, valor: valorEmpresa(j.estado), final: calcularFinal(j.estado).final }))
+    .map((j, idx) => ({ ...j, idx }))
     .sort((a, b) => b.valor - a.valor);
   const medallas = ["🥇", "🥈", "🥉", "4️⃣"];
   return (
@@ -99,13 +118,14 @@ export function Posiciones({ jugadores, onReiniciar, onVerInforme }) {
             <div className="rank-info">
               <div className="rank-nombre">{j.estado.nombreJugador}</div>
               <div className="rank-final" style={{ color: j.final.color }}>{j.final.emoji} {j.final.titulo}</div>
+              <div className="rank-pts">{j.puntajeTotal} pts · racha máx 🔥{j.estado.mejorRacha}</div>
             </div>
-            <button className="rank-informe" onClick={() => onVerInforme(j.idx)}>📋 Informe</button>
+            <button className="rank-informe" onClick={() => { sfx.click(); onVerInforme(j.idx); }}>📋 Informe</button>
             <span className="rank-valor" style={{ color: j.final.color }}>{j.valor}</span>
           </div>
         ))}
       </div>
-      <button className="btn btn-grande" onClick={onReiniciar}>↺ Nueva partida</button>
+      <button className="btn btn-grande" onClick={() => { sfx.click(); onReiniciar(); }}>↺ Nueva partida</button>
     </div>
   );
 }
