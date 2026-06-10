@@ -92,41 +92,69 @@ export function Tablero({ estado, ronda, totalRondas, etiqueta, fx }) {
   );
 }
 
-// --- Dado d20 (rueda con desaceleración, pausa dramática y crits) ---
-export function Dado({ rolling, valor, umbral, exito, critico, pifia, onDone }) {
-  const [cara, setCara] = useState(valor || 1);
+// --- Par de dados 2d6 (giran, el primero clava y el segundo estira la tensión) ---
+const PIPS = {
+  1: [5], 2: [3, 7], 3: [3, 5, 7], 4: [1, 3, 7, 9],
+  5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9],
+};
+
+function CaraD6({ valor }) {
+  return (
+    <div className="d6-cara">
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((c) => (
+        <span key={c} className={"pip" + (PIPS[valor].includes(c) ? " pip-on" : "")} />
+      ))}
+    </div>
+  );
+}
+
+export function Dado({ rolling, valor, d1, d2, umbral, exito, critico, pifia, onDone }) {
+  const [caras, setCaras] = useState([d1 || 1, d2 || 1]);
+  const [girando, setGirando] = useState([false, false]);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
   const settleRef = useRef(null);
 
   useEffect(() => {
     if (!rolling) {
-      setCara(valor || 1);
+      setCaras([d1 || 1, d2 || 1]);
+      setGirando([false, false]);
       return;
     }
     let cancelado = false;
     let timer = null;
     let delay = 70;
     let i = 0;
+    let fijado1 = false;
+    const rand = () => 1 + Math.floor(Math.random() * 6);
+    setGirando([true, true]);
     const settle = () => {
       if (cancelado) return;
       cancelado = true;
       clearTimeout(timer);
-      setCara(valor);
+      setCaras([d1, d2]);
+      setGirando([false, false]);
       if (onDoneRef.current) onDoneRef.current();
     };
     settleRef.current = settle;
     const tick = () => {
       if (cancelado) return;
-      setCara(1 + Math.floor(Math.random() * 20));
+      setCaras((c) => [fijado1 ? d1 : rand(), rand()]);
       sfx.diceTick(i++);
-      delay *= 1.14;
-      if (delay < 250) timer = setTimeout(tick, delay);
+      delay *= 1.12;
+      if (!fijado1 && delay >= 170) {
+        // el primer dado clava; el segundo acelera de nuevo y estira el suspenso
+        fijado1 = true;
+        delay = 90;
+        setCaras([d1, rand()]);
+        setGirando([false, true]);
+      }
+      if (delay < 240) timer = setTimeout(tick, delay);
       else timer = setTimeout(settle, 430); // pausa dramática antes de revelar
     };
     timer = setTimeout(tick, delay);
     return () => { cancelado = true; clearTimeout(timer); };
-  }, [rolling, valor]);
+  }, [rolling, d1, d2]);
 
   const estadoClase = rolling
     ? "dado-rolling"
@@ -135,27 +163,32 @@ export function Dado({ rolling, valor, umbral, exito, critico, pifia, onDone }) 
     : exito === true ? "dado-exito"
     : exito === false ? "dado-fracaso" : "";
 
+  const suma = caras[0] + caras[1];
+
   return (
     <div className="dado-wrap">
       <div
-        className={"dado " + estadoClase}
+        className={"dados-par " + estadoClase}
         onClick={() => rolling && settleRef.current && settleRef.current()}
-        title={rolling ? "Tocá para apurar el dado" : undefined}
+        title={rolling ? "Tocá para apurar los dados" : undefined}
       >
-        <svg viewBox="0 0 100 100" className="dado-svg" aria-hidden="true">
-          <polygon points="50,4 92,28 92,72 50,96 8,72 8,28" />
-          <polygon className="dado-inner" points="50,18 78,34 78,66 50,82 22,66 22,34" />
-        </svg>
-        <span className="dado-num">{cara}</span>
+        <div className={"dado-d6 " + (girando[0] ? "d6-girando" : "d6-quieto")}>
+          <CaraD6 valor={caras[0]} />
+        </div>
+        <span className="dados-mas">+</span>
+        <div className={"dado-d6 d6-segundo " + (girando[1] ? "d6-girando" : "d6-quieto")}>
+          <CaraD6 valor={caras[1]} />
+        </div>
+        <span className={"dados-total" + (rolling ? " total-rolling" : "")}>= {suma}</span>
       </div>
       {!rolling && exito != null && (
         <div className={"dado-result " + (critico ? "txt-critico" : pifia ? "txt-pifia" : exito ? "txt-exito" : "txt-fracaso")}>
           {critico ? "★ ¡CRÍTICO!" : pifia ? "☠ ¡PIFIA!" : exito ? "✓ ÉXITO" : "✗ FRACASO"}{" "}
-          <span className="dado-tirada">({cara} vs {umbral}+)</span>
+          <span className="dado-tirada">({valor} vs {umbral}+)</span>
         </div>
       )}
       {rolling && umbral && (
-        <div className="dado-objetivo">Necesitás {umbral}+ · con 20, crítico ★</div>
+        <div className="dado-objetivo">Necesitás {umbral}+ · doble 6 = crítico ★</div>
       )}
     </div>
   );
@@ -193,7 +226,7 @@ export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }
           <div className="dado-linea">
             <span className="dado-badge">🎲 Dado · {indRel ? indRel.nombre : "azar"}</span>
             {enRojo
-              ? <span className="dado-warning">⚠️ {indRel.nombre} en rojo: necesitás 15+</span>
+              ? <span className="dado-warning">⚠️ {indRel.nombre} en rojo: necesitás {umbral}+</span>
               : <span className="dado-normal">Éxito con {umbral}+</span>}
             {opcion.umbralMod ? (
               <span className={opcion.umbralMod > 0 ? "dado-warning" : "dado-bonus"}>

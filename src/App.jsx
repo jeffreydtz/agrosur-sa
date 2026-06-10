@@ -1,20 +1,25 @@
 // ============================================================
 // App.jsx — Orquestador: máquina de estados y los 2 modos
 // ============================================================
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
-  nuevoEstado, construirPlan, pasoDesde, calcularFinal,
+  nuevoEstado, construirPlan, hidratarPlan, pasoDesde, calcularFinal,
   chequearMisiones, puntajeFinal,
 } from "./engine.js";
 import { getMeta, recordRun, registrarLogros } from "./meta.js";
 import { checkLogros } from "./logros.js";
 import { sfx, getMuted, toggleMuted } from "./sound.js";
+import { onlineDisponible } from "./firebase.js";
+import { escucharRoom, publicarProgreso, publicarFinal } from "./online.js";
 import { Tablero } from "./components/ui.jsx";
 import {
   Intro, ComoJugar, ModoSelect, ArquetipoSelect, RondaView,
   EventoScreen, EventoMenorScreen,
 } from "./components/screens.jsx";
 import { FinalScreen, InformeScreen, Posiciones } from "./components/screens2.jsx";
+import {
+  OnlineMenu, OnlineNoConfig, OnlineSetup, LobbyScreen, OnlineHud, PosicionesOnline,
+} from "./components/online.jsx";
 import { ToastQueue } from "./components/juice.jsx";
 
 function Handoff({ jugador, onListo }) {
@@ -71,7 +76,41 @@ export default function Juego() {
   const [setupPlayer, setSetupPlayer] = useState(0);
   const [setupAcc, setSetupAcc] = useState([]);
 
+  // online (rooms)
+  const [online, setOnline] = useState(null); // {codigo, playerId, nombre, arqId, ...}
+  const [roomSnap, setRoomSnap] = useState(null);
+  const finalizadoRef = useRef(false);
+
   const esMulti = modo === "multi";
+  const esOnline = modo === "online";
+
+  // suscripción al room mientras haya uno activo
+  const vioRoomRef = useRef(false);
+  useEffect(() => {
+    if (!online) { setRoomSnap(null); vioRoomRef.current = false; return; }
+    const off = escucharRoom(online.codigo, setRoomSnap);
+    return off;
+  }, [online && online.codigo]);
+
+  // el room desapareció (el host lo cerró) estando en el lobby
+  useEffect(() => {
+    if (roomSnap) { vioRoomRef.current = true; return; }
+    if (fase === "onlineLobby" && vioRoomRef.current) {
+      setOnline(null);
+      setFase("onlineMenu");
+    }
+  }, [roomSnap, fase]);
+
+  // el host arrancó: todos pasan del lobby al juego
+  useEffect(() => {
+    if (fase !== "onlineLobby" || !roomSnap || roomSnap.estado !== "jugando") return;
+    const est = nuevoEstado(online.arqId, online.nombre);
+    setJugadores([{ estado: est }]);
+    setPlan(hidratarPlan(roomSnap.plan));
+    setPlanIdx(0); setTurnoIdx(0); setSubfase("jugar"); setFx(null);
+    finalizadoRef.current = false;
+    setFase("play");
+  }, [fase, roomSnap && roomSnap.estado]);
 
   function pushToasts(nuevos) {
     if (!nuevos.length) return;
@@ -90,12 +129,14 @@ export default function Juego() {
     setPlanIdx(0); setTurnoIdx(0); setSubfase("jugar"); setVerInformeIdx(null);
     setResumenFinal(null); setFx(null); setToasts([]);
     setSetupPlayer(0); setSetupAcc([]);
+    setOnline(null); setRoomSnap(null); finalizadoRef.current = false;
   }
 
   function elegirModo(m) {
     setModo(m);
     if (m === "individual") setFase("setupIndividual");
     else if (m === "multi") setFase("setupCount");
+    else if (m === "online") setFase(onlineDisponible ? "onlineMenu" : "onlineConfig");
   }
 
   function iniciarIndividual(arqId, nombre) {
@@ -124,6 +165,9 @@ export default function Juego() {
   // ns: nuevo estado del jugador en turno; resultado: detalle para feedback
   function aplicar(ns, resultado) {
     setJugadores((js) => js.map((j, i) => (i === turnoIdx ? { ...j, estado: ns } : j)));
+    if (esOnline && online) {
+      publicarProgreso(online.codigo, online.playerId, ns, plan[planIdx] ? plan[planIdx].label : 0);
+    }
     if (resultado && resultado.deltas) {
       const net = Object.values(resultado.deltas).reduce((a, b) => a + b, 0);
       setFx({ deltas: resultado.deltas, seq: ++seqRef.current, shake: net <= -10 });
@@ -135,7 +179,7 @@ export default function Juego() {
       }
       if (resultado.misionesNuevas.length) sfx.mision();
     }
-    if (!esMulti) {
+    if (modo === "individual") {
       const unlocked = checkLogros({ estado: ns, resultado, meta: getMeta() }, "partida");
       if (unlocked.length) {
         registrarLogros(unlocked.map((l) => l.id));
@@ -149,6 +193,8 @@ export default function Juego() {
   }
 
   function finalizar() {
+    if (finalizadoRef.current) return;
+    finalizadoRef.current = true;
     const cerrados = jugadores.map((j) => {
       const { final, valor } = calcularFinal(j.estado);
       const m = chequearMisiones(j.estado, { valor });
@@ -157,7 +203,17 @@ export default function Juego() {
     });
     setJugadores(cerrados);
 
-    if (!esMulti) {
+    if (esOnline) {
+      const j = cerrados[0];
+      publicarFinal(online.codigo, online.playerId, {
+        puntajeTotal: j.puntajeTotal,
+        finalNombre: j.final.emoji + " " + j.final.titulo,
+        valor: j.valor,
+      });
+      recordRun({ estado: j.estado, finalId: j.final.id, valor: 0, puntaje: 0, modo: "online" });
+      sfx.fanfarria();
+      setFase("posicionesOnline");
+    } else if (!esMulti) {
       const j = cerrados[0];
       const { nuevoRecord, meta } = recordRun({
         estado: j.estado, finalId: j.final.id, valor: j.valor,
@@ -212,6 +268,31 @@ export default function Juego() {
   else if (fase === "setupIndividual")
     contenido = <ArquetipoSelect titulo="Elegí tu AgroSur" permitirAzar mostrarColeccion onElegir={iniciarIndividual} />;
   else if (fase === "setupCount") contenido = <CountSelect onElegir={elegirCount} />;
+  else if (fase === "onlineConfig") contenido = <OnlineNoConfig onVolver={() => setFase("modo")} />;
+  else if (fase === "onlineMenu")
+    contenido = (
+      <OnlineMenu
+        onCrear={() => setFase("onlineCrear")}
+        onUnirse={() => setFase("onlineUnirse")}
+        onVolver={() => setFase("modo")}
+      />
+    );
+  else if (fase === "onlineCrear" || fase === "onlineUnirse")
+    contenido = (
+      <OnlineSetup
+        modoSetup={fase === "onlineCrear" ? "crear" : "unirse"}
+        onRoom={(datos) => { setOnline(datos); setFase("onlineLobby"); }}
+        onVolver={() => setFase("onlineMenu")}
+      />
+    );
+  else if (fase === "onlineLobby")
+    contenido = (
+      <LobbyScreen
+        online={online}
+        room={roomSnap}
+        onSalir={() => { setOnline(null); setFase("onlineMenu"); }}
+      />
+    );
   else if (fase === "setupPlayers")
     contenido = (
       <ArquetipoSelect
@@ -234,6 +315,7 @@ export default function Juego() {
     } else {
       contenido = (
         <div className={"play-wrap " + (fx && fx.shake ? "shake" : "")}>
+          {esOnline && <OnlineHud room={roomSnap} playerId={online.playerId} onExpira={finalizar} />}
           <Tablero estado={estado} ronda={desc.label} totalRondas={TOTAL_RONDAS} etiqueta={etiqueta} fx={fx} />
           {paso.kind === "evento" ? (
             <EventoScreen
@@ -261,6 +343,26 @@ export default function Juego() {
             />
           )}
         </div>
+      );
+    }
+  } else if (fase === "posicionesOnline") {
+    if (verInformeIdx != null) {
+      contenido = (
+        <InformeScreen
+          estado={jugadores[0].estado}
+          ctaTexto="◂ Volver a posiciones"
+          onCta={() => setVerInformeIdx(null)}
+          onReiniciar={reiniciar}
+        />
+      );
+    } else {
+      contenido = (
+        <PosicionesOnline
+          room={roomSnap}
+          playerId={online.playerId}
+          onVerInforme={() => setVerInformeIdx(0)}
+          onReiniciar={reiniciar}
+        />
       );
     }
   } else if (fase === "final") {

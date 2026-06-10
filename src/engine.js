@@ -5,7 +5,7 @@ import {
   ARQUETIPOS, FINALES, MISIONES, CRISIS_MOTIN, CRISIS_OFERTA,
   RONDAS, EVENTO_DOLAR, eventoSeVa,
 } from "./data.js";
-import { sortearEventosMenores } from "./dataEventos.js";
+import { sortearEventosMenores, EVENTOS_MENORES } from "./dataEventos.js";
 
 export const clamp = (v) => Math.max(0, Math.min(100, Math.round(v)));
 
@@ -73,16 +73,18 @@ export function chequearFin(estado) {
   return n;
 }
 
-// Umbral del dado: 11+ normal; 15+ si el indicador relacionado está en rojo (<30).
-// mod: ajuste por variante de carta (consecuencias encadenadas).
+// Umbral de los dados (2d6): 7+ normal (~58%); 9+ si el indicador relacionado
+// está en rojo (<30) (~28%). mod: ajuste por variante de carta.
 export function umbralDado(estado, rel, mod = 0) {
-  const base = rel && estado[rel] != null && estado[rel] < 30 ? 15 : 11;
-  return Math.max(2, Math.min(19, base + mod));
+  const base = rel && estado[rel] != null && estado[rel] < 30 ? 9 : 7;
+  return Math.max(3, Math.min(11, base + mod));
 }
 
-// Tira un d20
-export function tirarD20() {
-  return 1 + Math.floor(Math.random() * 20);
+// Tira 2d6
+export function tirarDados() {
+  const d1 = 1 + Math.floor(Math.random() * 6);
+  const d2 = 1 + Math.floor(Math.random() * 6);
+  return { d1, d2, total: d1 + d2 };
 }
 
 // --- helpers internos ---
@@ -148,7 +150,7 @@ export function chequearMisiones(estado, finalCtx = null) {
   return { estado: s, nuevas };
 }
 
-// Resuelve una opción elegida. Para opciones con dado, se le pasa el roll.
+// Resuelve una opción elegida. Para opciones con dado, se le pasa el roll de tirarDados().
 // Devuelve { estado, resultado } donde resultado describe lo ocurrido (para animar/loguear)
 export function resolverOpcion(estado, carta, opcion, roll) {
   const antes = snapshot(estado);
@@ -165,10 +167,11 @@ export function resolverOpcion(estado, carta, opcion, roll) {
 
   // 2) dado (con críticos y pifias)
   if (opcion.dado) {
+    const { d1, d2, total } = roll;
     const umbral = umbralDado(estado, opcion.rel, opcion.umbralMod || 0);
-    const critico = roll === 20;
-    const pifia = roll === 1;
-    const exito = critico ? true : pifia ? false : roll >= umbral;
+    const critico = total === 12; // doble 6
+    const pifia = total === 2;    // doble 1
+    const exito = critico ? true : pifia ? false : total >= umbral;
     let rama;
     if (critico) {
       rama = opcion.dado.critico || escalarRama(opcion.dado.exito, 1.5);
@@ -182,9 +185,9 @@ export function resolverOpcion(estado, carta, opcion, roll) {
     if (rama.resist) s = aplicarResistencia(s, rama.resist);
     if (rama.flag) s = agregarFlags(s, rama.flag);
     detalle.dado = {
-      roll, umbral, exito, critico, pifia,
-      casiExito: !exito && !pifia && roll === umbral - 1,
-      justo: exito && !critico && roll === umbral,
+      roll: total, d1, d2, umbral, exito, critico, pifia,
+      casiExito: !exito && !pifia && total === umbral - 1,
+      justo: exito && !critico && total === umbral,
       rel: opcion.rel, nota: rama.nota,
     };
   }
@@ -364,6 +367,24 @@ export function construirPlan({ multi = false } = {}) {
     }
   }
   return plan;
+}
+
+// Plan serializable para compartir en un room online (los eventos menores
+// llevan funciones resolver: se guardan por id y se rehidratan al leer).
+export function serializarPlan(plan) {
+  return plan.map((p) =>
+    p.t === "menor"
+      ? { t: p.t, eventoId: p.evento.id, label: p.label }
+      : { t: p.t, id: p.id || null, label: p.label }
+  );
+}
+
+export function hidratarPlan(planSer) {
+  return planSer.map((p) =>
+    p.t === "menor"
+      ? { t: p.t, evento: EVENTOS_MENORES.find((e) => e.id === p.eventoId), label: p.label }
+      : { t: p.t, id: p.id || undefined, label: p.label }
+  );
 }
 
 // Resuelve la carta concreta de un paso del plan según el estado del jugador

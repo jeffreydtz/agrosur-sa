@@ -3,7 +3,7 @@
 // ============================================================
 import { useState } from "react";
 import { ARQUETIPOS, INDICADORES, MISIONES } from "../data.js";
-import { tirarD20, resolverOpcion, resolverEvento, resolverEventoMenor, aplicarGolpe } from "../engine.js";
+import { tirarDados, resolverOpcion, resolverEvento, resolverEventoMenor, aplicarGolpe } from "../engine.js";
 import { getMeta } from "../meta.js";
 import { sfx } from "../sound.js";
 import { Dado, Efectos, Opcion } from "./ui.jsx";
@@ -73,7 +73,7 @@ export function ComoJugar({ onSiguiente }) {
         <ol className="cj-lista">
           <li>Gestionás AgroSur S.A. durante <b>12 rondas</b>. Cada ronda presenta una situación con <b>3 opciones</b> — y entre rondas pueden caer <b>titulares sorpresa</b>.</li>
           <li>Tus decisiones suben ⬆️ o bajan ⬇️ los <b>4 indicadores</b>: 💰 Caja, 🤝 Confianza, ⚙️ Adopción y 🔥 Motivación.</li>
-          <li>Las opciones con <b>🎲</b> tiran un dado de 20: con <b>11+</b> sale bien. Si el indicador relacionado está <b className="rojo-txt">en rojo (&lt;30)</b>, necesitás <b>15+</b>. Un <b>20 natural es CRÍTICO ★</b>; un <b>1 es PIFIA ☠</b>.</li>
+          <li>Las opciones con <b>🎲</b> tiran <b>dos dados</b>: con <b>7+</b> sale bien. Si el indicador relacionado está <b className="rojo-txt">en rojo (&lt;30)</b>, necesitás <b>9+</b>. <b>Doble 6 es CRÍTICO ★</b>; <b>doble 1 es PIFIA ☠</b>.</li>
           <li>Encadenar rondas positivas arma una <b>🔥 racha</b> que multiplica tus puntos. Tu arquetipo trae <b>🎯 2 misiones</b> propias.</li>
           <li>Si la 💰 Caja llega a 0 o la 🤝 Confianza cae a 10, la partida termina antes.</li>
           <li>Al final: <b>Valor de Empresa</b>, puntaje, logros y el informe del Consultor.</li>
@@ -94,7 +94,8 @@ export function ComoJugar({ onSiguiente }) {
 export function ModoSelect({ onElegir }) {
   const modos = [
     { id: "individual", emoji: "👤", nombre: "Individual", desc: "Campaña de 12 rondas. Misiones, logros y tu récord personal." },
-    { id: "multi", emoji: "👥", nombre: "Multijugador", desc: "2 a 4 jugadores, mismo dispositivo. Gana el mayor Valor de Empresa." },
+    { id: "multi", emoji: "👥", nombre: "Pass & Play", desc: "2 a 4 jugadores, mismo dispositivo, pasándoselo por turnos. Gana el mayor Valor de Empresa." },
+    { id: "online", emoji: "🌐", nombre: "Online", desc: "Rooms con código para compartir. Cada uno juega su empresa, ranking en vivo y tiempo límite." },
   ];
   return (
     <div className="pantalla modo-select">
@@ -216,7 +217,7 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
     if (fase !== "elegir") return;
     sfx.click();
     if (opcion.dado) {
-      const roll = tirarD20();
+      const roll = tirarDados();
       const { estado: ns, resultado } = resolverOpcion(estado, carta, opcion, roll);
       setPend({ estado: ns, detalle: resultado, opcion });
       setFase("tirando");
@@ -283,6 +284,8 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
             <Dado
               rolling={true}
               valor={dadoDetalle.roll}
+              d1={dadoDetalle.d1}
+              d2={dadoDetalle.d2}
               umbral={dadoDetalle.umbral}
               exito={null}
               onDone={dadoListo}
@@ -297,6 +300,8 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
               <Dado
                 rolling={false}
                 valor={dadoDetalle.roll}
+                d1={dadoDetalle.d1}
+                d2={dadoDetalle.d2}
                 umbral={dadoDetalle.umbral}
                 exito={dadoDetalle.exito}
                 critico={dadoDetalle.critico}

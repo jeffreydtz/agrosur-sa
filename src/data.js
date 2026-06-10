@@ -463,7 +463,7 @@ export const RONDAS = [
         narrativaExtra:
           "Y hay algo peor: desde que sancionaste a un culpable por el error millonario, nadie reporta los problemas. Este venía incubándose hace semanas y te enteraste por el cliente. El miedo esconde los errores; no los arregla.",
         efEntrada: { confianza: -5, motivacion: -3 },
-        opcionesPatch: { B: { umbralMod: 2 } },
+        opcionesPatch: { B: { umbralMod: 1 } },
       },
     ],
     opciones: [
@@ -602,7 +602,7 @@ export const CRISIS_MOTIN = {
       ribbon: "🤝 LAZOS QUE VUELVEN",
       narrativaExtra:
         "Pero algo cambió: Don Raúl te frena antes de la asamblea. «Yo sé que vos escuchás, pibe. Convencé al resto.» El vínculo que construiste te abre una puerta.",
-      opcionesPatch: { B: { umbralMod: -2 } },
+      opcionesPatch: { B: { umbralMod: -1 } },
     },
   ],
   opciones: [
