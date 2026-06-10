@@ -65,7 +65,7 @@ export function Intro({ onComenzar }) {
 // ============================================================
 // CÓMO JUGAR
 // ============================================================
-export function ComoJugar({ onSiguiente }) {
+export function ComoJugar({ onSiguiente, onVolver }) {
   return (
     <div className="pantalla como-jugar">
       <div className="cj-card">
@@ -84,6 +84,7 @@ export function ComoJugar({ onSiguiente }) {
         </p>
         <button className="btn btn-grande" onClick={() => { sfx.click(); onSiguiente(); }}>Entendido ▸</button>
       </div>
+      <button className="btn btn-ghost" onClick={() => { sfx.click(); onVolver(); }}>◂ Volver</button>
     </div>
   );
 }
@@ -91,7 +92,7 @@ export function ComoJugar({ onSiguiente }) {
 // ============================================================
 // SELECCIÓN DE MODO
 // ============================================================
-export function ModoSelect({ onElegir }) {
+export function ModoSelect({ onElegir, onVolver }) {
   const modos = [
     { id: "individual", emoji: "👤", nombre: "Individual", desc: "Campaña de 12 rondas. Misiones, logros y tu récord personal." },
     { id: "multi", emoji: "👥", nombre: "Pass & Play", desc: "2 a 4 jugadores, mismo dispositivo, pasándoselo por turnos. Gana el mayor Valor de Empresa." },
@@ -109,6 +110,7 @@ export function ModoSelect({ onElegir }) {
           </button>
         ))}
       </div>
+      {onVolver && <button className="btn btn-ghost" onClick={() => { sfx.click(); onVolver(); }}>◂ Volver</button>}
     </div>
   );
 }
@@ -152,7 +154,7 @@ export function ArquetipoCard({ arq, onElegir, ganado }) {
   );
 }
 
-export function ArquetipoSelect({ titulo, permitirAzar, onElegir, jugadorNum, mostrarColeccion }) {
+export function ArquetipoSelect({ titulo, permitirAzar, onElegir, jugadorNum, mostrarColeccion, onVolver }) {
   const [nombre, setNombre] = useState("");
   const meta = getMeta();
   return (
@@ -182,6 +184,7 @@ export function ArquetipoSelect({ titulo, permitirAzar, onElegir, jugadorNum, mo
           🎲 Asignar al azar
         </button>
       )}
+      {onVolver && <button className="btn btn-ghost" onClick={() => { sfx.click(); onVolver(); }}>◂ Volver</button>}
       {mostrarColeccion && meta.partidas > 0 && (
         <div className="coleccion-footer">
           <span>Partidas <b>{meta.partidas}</b></span>

@@ -36,7 +36,7 @@ function Handoff({ jugador, onListo }) {
   );
 }
 
-function CountSelect({ onElegir }) {
+function CountSelect({ onElegir, onVolver }) {
   return (
     <div className="pantalla modo-select">
       <h2 className="seccion-titulo">¿Cuántos jugadores?</h2>
@@ -45,6 +45,7 @@ function CountSelect({ onElegir }) {
           <button key={n} className="count-btn" onClick={() => { sfx.click(); onElegir(n); }}>{n}</button>
         ))}
       </div>
+      <button className="btn btn-ghost" onClick={() => { sfx.click(); onVolver(); }}>◂ Volver</button>
     </div>
   );
 }
@@ -263,11 +264,20 @@ export default function Juego() {
   let contenido = null;
 
   if (fase === "intro") contenido = <Intro onComenzar={() => setFase("comoJugar")} />;
-  else if (fase === "comoJugar") contenido = <ComoJugar onSiguiente={() => setFase("modo")} />;
-  else if (fase === "modo") contenido = <ModoSelect onElegir={elegirModo} />;
+  else if (fase === "comoJugar") contenido = <ComoJugar onSiguiente={() => setFase("modo")} onVolver={() => setFase("intro")} />;
+  else if (fase === "modo") contenido = <ModoSelect onElegir={elegirModo} onVolver={() => setFase("comoJugar")} />;
   else if (fase === "setupIndividual")
-    contenido = <ArquetipoSelect titulo="Elegí tu AgroSur" permitirAzar mostrarColeccion onElegir={iniciarIndividual} />;
-  else if (fase === "setupCount") contenido = <CountSelect onElegir={elegirCount} />;
+    contenido = (
+      <ArquetipoSelect
+        titulo="Elegí tu AgroSur"
+        permitirAzar
+        mostrarColeccion
+        onElegir={iniciarIndividual}
+        onVolver={() => { setModo(null); setFase("modo"); }}
+      />
+    );
+  else if (fase === "setupCount")
+    contenido = <CountSelect onElegir={elegirCount} onVolver={() => { setModo(null); setFase("modo"); }} />;
   else if (fase === "onlineConfig") contenido = <OnlineNoConfig onVolver={() => setFase("modo")} />;
   else if (fase === "onlineMenu")
     contenido = (
@@ -301,6 +311,11 @@ export default function Juego() {
         permitirAzar
         jugadorNum={setupPlayer + 1}
         onElegir={setupJugador}
+        onVolver={() => {
+          if (setupPlayer === 0) { setFase("setupCount"); return; }
+          setSetupAcc(setupAcc.slice(0, -1));
+          setSetupPlayer(setupPlayer - 1);
+        }}
       />
     );
   else if (fase === "play") {
