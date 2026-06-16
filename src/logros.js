@@ -69,8 +69,8 @@ export const LOGROS = [
   },
   {
     id: "leyenda", emoji: "🏛️", nombre: "Leyenda de la Bolsa", fase: "final",
-    desc: "Ganá con los 5 arquetipos.",
-    test: (c) => c.meta.arquetiposGanados.length >= 5,
+    desc: "Ganá con los 6 arquetipos.",
+    test: (c) => c.meta.arquetiposGanados.length >= 6,
   },
 ];
 

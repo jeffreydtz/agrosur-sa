@@ -2,7 +2,8 @@
 // ui.jsx — Componentes presentacionales
 // ============================================================
 import { useState, useEffect, useRef } from "react";
-import { INDICADORES } from "../data.js";
+import { INDICADORES, AFIN_BY_ARQ } from "../data.js";
+import { CAT_LABEL } from "../dataPool.js";
 import { estadoColor, umbralDado } from "../engine.js";
 import { sfx } from "../sound.js";
 import { RachaChip } from "./juice.jsx";
@@ -197,7 +198,9 @@ export function Dado({ rolling, valor, d1, d2, umbral, exito, critico, pifia, on
 // --- Botón de opción ---
 export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }) {
   const esDado = !!opcion.dado;
-  const umbral = esDado ? umbralDado(estado, opcion.rel, opcion.umbralMod || 0) : null;
+  // Fuera de perfil: categoría que no está en la afinidad del arquetipo
+  const off = !!(opcion.cat && !(AFIN_BY_ARQ[estado.arquetipo] || []).includes(opcion.cat));
+  const umbral = esDado ? umbralDado(estado, opcion.rel, (opcion.umbralMod || 0) + (off ? 1 : 0)) : null;
   const enRojo = esDado && opcion.rel && estado[opcion.rel] < 30;
   const indRel = opcion.rel ? INDICADORES[opcion.rel] : null;
   const rachaEnJuego = esDado && estado.racha >= 3;
@@ -213,6 +216,15 @@ export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }
         <span className="opcion-texto">{opcion.texto}</span>
         {esDado && <span className="opcion-d20">🎲</span>}
       </div>
+
+      {opcion.cat && (
+        <div className="opcion-cat">
+          <span className={"cat-chip " + (off ? "cat-off" : "cat-on")}>
+            {CAT_LABEL[opcion.cat]} {off ? "· fuera de perfil" : "· tu fuerte"}
+          </span>
+          {off && <span className="cat-hint">+60% puntos si sale bien</span>}
+        </div>
+      )}
 
       {!esDado && (
         <div className="opcion-ef"><Efectos ef={opcion.ef} /></div>
@@ -233,6 +245,9 @@ export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }
                 {opcion.umbralMod > 0 ? `🔁 +${opcion.umbralMod} por consecuencia` : `🤝 ${opcion.umbralMod} por tus lazos`}
               </span>
             ) : null}
+            {off
+              ? <span className="dado-warning">🚀 Fuera de perfil: +1 al umbral</span>
+              : opcion.cat ? <span className="dado-bonus">✓ Tu terreno: tirada confiable</span> : null}
             {rachaEnJuego && <span className="dado-racha-tag">🔥 Racha en juego</span>}
           </div>
           <div className="rama rama-exito">

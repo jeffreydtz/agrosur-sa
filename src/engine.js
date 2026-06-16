@@ -2,14 +2,40 @@
 // engine.js — Lógica del juego (puro, sin React)
 // ============================================================
 import {
-  ARQUETIPOS, FINALES, MISIONES, CRISIS_MOTIN, CRISIS_OFERTA,
-  RONDAS, EVENTO_DOLAR, eventoSeVa,
+  ARQUETIPOS, AFIN_BY_ARQ, FINALES, MISIONES, CRISIS_MOTIN, CRISIS_OFERTA,
+  EVENTO_DOLAR, eventoSeVa,
 } from "./data.js";
+import { POOL, POOL_BY_ID } from "./dataPool.js";
 import { sortearEventosMenores, EVENTOS_MENORES } from "./dataEventos.js";
 
 export const clamp = (v) => Math.max(0, Math.min(100, Math.round(v)));
 
 const VISIBLES = ["caja", "confianza", "adopcion", "motivacion"];
+
+// Cantidad de cartas del cuerpo (sorteadas) + crisis + balance = 13 round-steps
+export const DECK_BODY_LEN = 11;
+export const TOTAL_RONDAS = DECK_BODY_LEN + 2; // = 13 (cuerpo + crisis + balance)
+
+// Fisher-Yates: copia barajada
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ¿La categoría de la opción está FUERA del perfil del arquetipo?
+// Sin `cat` -> se trata como en perfil (neutral).
+export function esOffProfile(estado, opcion) {
+  if (!opcion || !opcion.cat) return false;
+  const afin = AFIN_BY_ARQ[estado.arquetipo] || [];
+  return !afin.includes(opcion.cat);
+}
+
+// Bonus de puntaje cuando una jugada fuera de perfil sale bien
+const OFF_PROFILE_BONUS_MULT = 1.6;
 
 // Estado inicial de una empresa según arquetipo
 export function nuevoEstado(arqId, nombreJugador) {
@@ -33,6 +59,8 @@ export function nuevoEstado(arqId, nombreJugador) {
     rondasJugadas: 0,
     racha: 0,
     mejorRacha: 0,
+    offWins: 0,        // decisiones FUERA de perfil ganadas
+    onWins: 0,         // decisiones EN perfil ganadas
     puntaje: 0,
     ptsMisiones: 0,
     minCaja: a.caja,
@@ -155,9 +183,10 @@ export function chequearMisiones(estado, finalCtx = null) {
 export function resolverOpcion(estado, carta, opcion, roll) {
   const antes = snapshot(estado);
   let s = { ...estado };
+  const offProfile = esOffProfile(estado, opcion); // fuera de perfil del arquetipo
   const detalle = {
     cartaId: carta.id, cartaTitulo: carta.titulo, ronda: carta.ronda,
-    opcionId: opcion.id, opcionTexto: opcion.texto,
+    opcionId: opcion.id, opcionTexto: opcion.texto, cat: opcion.cat,
   };
 
   // 1) costo / efecto base siempre se aplica
@@ -168,7 +197,8 @@ export function resolverOpcion(estado, carta, opcion, roll) {
   // 2) dado (con críticos y pifias)
   if (opcion.dado) {
     const { d1, d2, total } = roll;
-    const umbral = umbralDado(estado, opcion.rel, opcion.umbralMod || 0);
+    // Fuera de perfil => +1 al umbral (más difícil). Stackea con umbralMod de variantes.
+    const umbral = umbralDado(estado, opcion.rel, (opcion.umbralMod || 0) + (offProfile ? 1 : 0));
     const critico = total === 12; // doble 6
     const pifia = total === 2;    // doble 1
     const exito = critico ? true : pifia ? false : total >= umbral;
@@ -210,17 +240,33 @@ export function resolverOpcion(estado, carta, opcion, roll) {
     s.racha = estado.racha;
   }
 
-  // 5) puntaje: deltas positivos + bonus de dado, multiplicado por racha
+  // 5) puntaje: deltas positivos + bonus de dado, × bonus afinidad × racha
+  // "salió bien": con dado = éxito/crítico; sin dado = deltas netos positivos.
+  const exitoEfectivo = detalle.dado
+    ? (detalle.dado.critico || detalle.dado.exito)
+    : netDelta > 0;
   let base = Object.values(detalle.deltas).filter((v) => v > 0).reduce((a, b) => a + b, 0);
   if (detalle.dado) {
     if (detalle.dado.critico) base += 25;
     else if (detalle.dado.exito) base += 10;
   }
-  const pts = Math.round(base * (1 + 0.1 * Math.min(s.racha, 5)));
+  // Fuera de perfil que sale bien => suma más (riesgo recompensado)
+  const offBonus = offProfile && exitoEfectivo ? OFF_PROFILE_BONUS_MULT : 1;
+  const pts = Math.round(base * offBonus * (1 + 0.1 * Math.min(s.racha, 5)));
   s.puntaje = estado.puntaje + pts;
   s.ptsMisiones = estado.ptsMisiones;
   detalle.puntos = pts;
   detalle.racha = s.racha;
+  detalle.offProfile = offProfile;
+  detalle.offProfileExito = offProfile && exitoEfectivo;
+  // contadores de afinidad (sólo cuentan opciones categorizadas que salieron bien)
+  if (opcion.cat && exitoEfectivo) {
+    if (offProfile) s.offWins = (estado.offWins || 0) + 1;
+    else s.onWins = (estado.onWins || 0) + 1;
+  } else {
+    s.offWins = estado.offWins || 0;
+    s.onWins = estado.onWins || 0;
+  }
 
   // 6) misiones de partida
   const m = chequearMisiones(s);
@@ -323,27 +369,41 @@ export function crisisFinal(estado) {
 }
 
 // ============================================================
-// Plan de partida: 12 rondas + 2 eventos fijos + 2-3 menores sorteados.
-// Se construye UNA vez por partida (en multijugador, compartido).
+// Plan de partida: 11 cartas RANDOM del pool + crisis + balance (cierre) +
+// 2 eventos fijos (dólar, se va) + 2-3 menores sorteados. Cada partida varía.
+// Se construye UNA vez por partida (en multijugador, compartido: sólo universales).
 // Pasos: { t:'r', id } | { t:'dolar' } | { t:'seva' } | { t:'crisis' } | { t:'menor', evento }
 // Cada paso lleva `label` para el contador de ronda del tablero.
 // ============================================================
-export function construirPlan({ multi = false } = {}) {
+export function construirPlan({ arqId, multi = false } = {}) {
+  // Cartas elegibles: universales + exclusivas del arquetipo (sólo individual).
+  // En multijugador se excluyen TODAS las exclusivas (mazo compartido por id).
+  // `balance` se reserva siempre como carta de cierre (no entra al sorteo).
+  const eligibles = POOL.filter(
+    (c) => c.id !== "balance" &&
+      (!c.soloArq || (!multi && arqId && c.soloArq.includes(arqId)))
+  );
+  if (eligibles.length < DECK_BODY_LEN) {
+    throw new Error(`Pool insuficiente: ${eligibles.length} cartas elegibles, se necesitan ${DECK_BODY_LEN}.`);
+  }
+  const cuerpo = shuffle(eligibles).slice(0, DECK_BODY_LEN); // 11 cartas random sin repetir
+
+  // Estructura fija: 3 cartas → dólar → 5 cartas → se va → 3 cartas → crisis → balance
   const base = [
-    { t: "r", id: "sequia" }, { t: "r", id: "fintech" }, { t: "r", id: "rumbo" },
+    ...cuerpo.slice(0, 3).map((c) => ({ t: "r", id: c.id })),
     { t: "dolar" },
-    { t: "r", id: "siempre" }, { t: "r", id: "tribus" }, { t: "r", id: "cambiamos" }, { t: "r", id: "error" },
+    ...cuerpo.slice(3, 8).map((c) => ({ t: "r", id: c.id })),
     { t: "seva" },
-    { t: "r", id: "renuncias" }, { t: "r", id: "appmovil" }, { t: "r", id: "denuncia" },
+    ...cuerpo.slice(8, 11).map((c) => ({ t: "r", id: c.id })),
     { t: "crisis" },
     { t: "r", id: "balance" },
   ];
 
   // Huecos válidos para eventos menores: entre dos rondas consecutivas (nunca
-  // pegados a un evento fijo ni a la crisis, nunca antes de la ronda 2).
+  // pegados a un evento fijo ni a la crisis, nunca antes de la 1ra carta).
   const huecos = [];
-  for (let i = 0; i < base.length - 1; i++) {
-    if (base[i].t === "r" && base[i + 1].t === "r" && base[i].id !== "sequia") huecos.push(i);
+  for (let i = 1; i < base.length - 1; i++) {
+    if (base[i].t === "r" && base[i + 1].t === "r") huecos.push(i);
   }
   const n = multi ? 2 : 2 + Math.floor(Math.random() * 2); // 2 (multi) | 2-3 (individual)
   const eventos = sortearEventosMenores(n);
@@ -353,17 +413,14 @@ export function construirPlan({ multi = false } = {}) {
     plan.splice(idx + 1, 0, { t: "menor", evento: eventos[k] });
   });
 
-  // Etiquetas de ronda: las rondas usan su número; eventos muestran "N½"
-  let ultima = 0;
+  // Etiquetas: las cartas/crisis usan su posición en el mazo; eventos muestran "N½"
+  let n2 = 0;
   for (const paso of plan) {
-    if (paso.t === "r") {
-      ultima = RONDAS.find((r) => r.id === paso.id).ronda;
-      paso.label = ultima;
-    } else if (paso.t === "crisis") {
-      ultima = 11;
-      paso.label = 11;
+    if (paso.t === "r" || paso.t === "crisis") {
+      n2 += 1;
+      paso.label = n2;
     } else {
-      paso.label = ultima + "½";
+      paso.label = n2 + "½";
     }
   }
   return plan;
@@ -390,7 +447,7 @@ export function hidratarPlan(planSer) {
 // Resuelve la carta concreta de un paso del plan según el estado del jugador
 export function pasoDesde(paso, estado) {
   if (paso.t === "r") {
-    const carta = RONDAS.find((r) => r.id === paso.id);
+    const carta = POOL_BY_ID[paso.id];
     return { kind: "ronda", carta: aplicarVariante(carta, estado.flags) };
   }
   if (paso.t === "dolar") return { kind: "evento", carta: EVENTO_DOLAR };

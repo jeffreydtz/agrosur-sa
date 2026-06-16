@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   nuevoEstado, construirPlan, hidratarPlan, pasoDesde, calcularFinal,
-  chequearMisiones, puntajeFinal,
+  chequearMisiones, puntajeFinal, TOTAL_RONDAS,
 } from "./engine.js";
 import { getMeta, recordRun, registrarLogros } from "./meta.js";
 import { checkLogros } from "./logros.js";
@@ -49,8 +49,6 @@ function CountSelect({ onElegir, onVolver }) {
     </div>
   );
 }
-
-const TOTAL_RONDAS = 12;
 
 export default function Juego() {
   const [fase, setFase] = useState("intro");
@@ -143,7 +141,7 @@ export default function Juego() {
   function iniciarIndividual(arqId, nombre) {
     const est = nuevoEstado(arqId, nombre);
     setJugadores([{ estado: est }]);
-    setPlan(construirPlan({ multi: false }));
+    setPlan(construirPlan({ arqId, multi: false }));
     setPlanIdx(0); setTurnoIdx(0); setSubfase("jugar"); setFx(null);
     setFase("play");
   }

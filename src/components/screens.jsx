@@ -48,9 +48,10 @@ export function Intro({ onComenzar }) {
         <div className="intro-sub">Crónicas del Cambio</div>
         <p className="intro-lead">
           Sos el nuevo <strong>Gerente de Transformación</strong> de una corredora de granos
-          rosarina con 30 años de tradición. Durante <strong>12 rondas</strong> vas a decidir
-          el rumbo de la empresa. Al final, sabrás qué AgroSur construiste —
-          y el Consultor te dirá por qué.
+          rosarina con 30 años de tradición. Durante <strong>13 rondas</strong> vas a decidir
+          el rumbo de la empresa. <strong>Cada partida baraja un mazo distinto</strong>, y cada
+          decisión pesa según el tipo de empresa que elijas. Al final, sabrás qué AgroSur
+          construiste — y el Consultor te dirá por qué.
         </p>
         <button className="btn btn-grande" onClick={() => { sfx.click(); onComenzar(); }}>Empezar ▸</button>
         <div className="intro-pie">Organización y Gestión Empresaria · UAI Rosario</div>
@@ -71,8 +72,9 @@ export function ComoJugar({ onSiguiente, onVolver }) {
       <div className="cj-card">
         <h2 className="cj-titulo">Cómo jugar</h2>
         <ol className="cj-lista">
-          <li>Gestionás AgroSur S.A. durante <b>12 rondas</b>. Cada ronda presenta una situación con <b>3 opciones</b> — y entre rondas pueden caer <b>titulares sorpresa</b>.</li>
+          <li>Gestionás AgroSur S.A. durante <b>13 rondas</b>, con un <b>mazo distinto cada partida</b>. Cada ronda presenta una situación con <b>3 opciones</b> — y entre rondas pueden caer <b>titulares sorpresa</b>.</li>
           <li>Tus decisiones suben ⬆️ o bajan ⬇️ los <b>4 indicadores</b>: 💰 Caja, 🤝 Confianza, ⚙️ Adopción y 🔥 Motivación.</li>
+          <li>Cada empresa tiene un <b>perfil</b>: las decisiones de tu fuerte son <b>confiables</b>; las que están <b>fuera de perfil</b> son más difíciles, pero si salen bien <b>suman más</b>.</li>
           <li>Las opciones con <b>🎲</b> tiran <b>dos dados</b>: con <b>7+</b> sale bien. Si el indicador relacionado está <b className="rojo-txt">en rojo (&lt;30)</b>, necesitás <b>9+</b>. <b>Doble 6 es CRÍTICO ★</b>; <b>doble 1 es PIFIA ☠</b>.</li>
           <li>Encadenar rondas positivas arma una <b>🔥 racha</b> que multiplica tus puntos. Tu arquetipo trae <b>🎯 2 misiones</b> propias.</li>
           <li>Si la 💰 Caja llega a 0 o la 🤝 Confianza cae a 10, la partida termina antes.</li>
@@ -94,7 +96,7 @@ export function ComoJugar({ onSiguiente, onVolver }) {
 // ============================================================
 export function ModoSelect({ onElegir, onVolver }) {
   const modos = [
-    { id: "individual", emoji: "👤", nombre: "Individual", desc: "Campaña de 12 rondas. Misiones, logros y tu récord personal." },
+    { id: "individual", emoji: "👤", nombre: "Individual", desc: "Campaña de 13 rondas con mazo random. Misiones, logros y tu récord personal." },
     { id: "multi", emoji: "👥", nombre: "Pass & Play", desc: "2 a 4 jugadores, mismo dispositivo, pasándoselo por turnos. Gana el mayor Valor de Empresa." },
     { id: "online", emoji: "🌐", nombre: "Online", desc: "Rooms con código para compartir. Cada uno juega su empresa, ranking en vivo y tiempo límite." },
   ];
@@ -190,7 +192,7 @@ export function ArquetipoSelect({ titulo, permitirAzar, onElegir, jugadorNum, mo
           <span>Partidas <b>{meta.partidas}</b></span>
           <span>Récord <b>{meta.mejorPuntaje}</b></span>
           <span>Finales <b>{meta.finalesVistos.length}/7</b></span>
-          <span>Arquetipos ganados <b>{meta.arquetiposGanados.length}/5</b></span>
+          <span>Arquetipos ganados <b>{meta.arquetiposGanados.length}/6</b></span>
           <span>Logros <b>{Object.keys(meta.logros).length}/13</b></span>
         </div>
       )}
