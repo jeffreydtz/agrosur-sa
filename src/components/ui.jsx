@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { INDICADORES, AFIN_BY_ARQ } from "../data.js";
 import { CAT_LABEL } from "../dataPool.js";
-import { estadoColor, umbralDado } from "../engine.js";
+import { estadoColor, umbralDado, esApuesta, previsualizarApuesta } from "../engine.js";
 import { sfx } from "../sound.js";
 import { RachaChip } from "./juice.jsx";
 
@@ -200,21 +200,26 @@ export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }
   const esDado = !!opcion.dado;
   // Fuera de perfil: categoría que no está en la afinidad del arquetipo
   const off = !!(opcion.cat && !(AFIN_BY_ARQ[estado.arquetipo] || []).includes(opcion.cat));
+  // Apuesta: opción fuera de perfil, sin dado propio y con efecto positivo
+  // => se resuelve tirando dados (riesgo real, no bonus gratis).
+  const apuesta = esApuesta(estado, opcion);
+  const esTirada = esDado || apuesta;
+  const pv = apuesta ? previsualizarApuesta(estado, opcion) : null;
   const umbral = esDado ? umbralDado(estado, opcion.rel, (opcion.umbralMod || 0) + (off ? 1 : 0)) : null;
   const enRojo = esDado && opcion.rel && estado[opcion.rel] < 30;
   const indRel = opcion.rel ? INDICADORES[opcion.rel] : null;
-  const rachaEnJuego = esDado && estado.racha >= 3;
+  const rachaEnJuego = esTirada && estado.racha >= 3;
 
   return (
     <button
-      className={"opcion " + (esDado ? "opcion-dado " : "") + (seleccionada ? "opcion-sel " : "")}
+      className={"opcion " + (esTirada ? "opcion-dado " : "") + (apuesta ? "opcion-apuesta " : "") + (seleccionada ? "opcion-sel " : "")}
       onClick={() => onElegir(opcion)}
       disabled={deshabilitado}
     >
       <div className="opcion-head">
         <span className="opcion-letra">{opcion.id}</span>
         <span className="opcion-texto">{opcion.texto}</span>
-        {esDado && <span className="opcion-d20">🎲</span>}
+        {esTirada && <span className="opcion-d20">🎲</span>}
       </div>
 
       {opcion.cat && (
@@ -222,12 +227,32 @@ export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }
           <span className={"cat-chip " + (off ? "cat-off" : "cat-on")}>
             {CAT_LABEL[opcion.cat]} {off ? "· fuera de perfil" : "· tu fuerte"}
           </span>
-          {off && <span className="cat-hint">+60% puntos si sale bien</span>}
+          {off && !apuesta && <span className="cat-hint">+60% puntos si sale bien</span>}
+          {apuesta && <span className="cat-hint cat-hint-apuesta">🎲 apuesta · sale mejor o rebota</span>}
         </div>
       )}
 
-      {!esDado && (
+      {!esTirada && (
         <div className="opcion-ef"><Efectos ef={opcion.ef} /></div>
+      )}
+
+      {apuesta && pv && (
+        <div className="opcion-dado-info opcion-apuesta-info">
+          <div className="dado-linea">
+            <span className="dado-badge apuesta-badge">🎲 Apuesta · fuera de tu terreno</span>
+            {pv.rel && estado[pv.rel] < 30
+              ? <span className="dado-warning">⚠️ {INDICADORES[pv.rel].nombre} en rojo: sale con {pv.umbral}+</span>
+              : <span className="dado-warning">Sale bien con {pv.umbral}+</span>}
+            <span className="dado-bonus">★ +60% puntos si sale</span>
+            {rachaEnJuego && <span className="dado-racha-tag">🔥 Racha en juego</span>}
+          </div>
+          <div className="rama rama-exito">
+            <span className="rama-label">Sale</span><Efectos ef={pv.exito} />
+          </div>
+          <div className="rama rama-fracaso">
+            <span className="rama-label">Rebota</span><Efectos ef={pv.fracaso} />
+          </div>
+        </div>
       )}
 
       {esDado && (

@@ -11,10 +11,16 @@
 //
 // Estructura de opción (igual que antes + `cat`):
 //   { id, texto, cat, ef:{caja,confianza,adopcion,motivacion}, resist, flag,
-//     rel, umbralMod, dado:{exito,fracaso,critico,pifia} }
+//     rel, umbralMod, dado:{exito,fracaso,critico,pifia},
+//     offDado?, offEf?, noApuesta? }
 //   `cat` = categoría de la decisión. Si la categoría NO está en la afinidad
-//   del arquetipo, la opción es "fuera de perfil": dado +1, pero +60% puntos
-//   si sale bien (ver engine.js / esOffProfile).
+//   del arquetipo, la opción es "fuera de perfil".
+//   APUESTA: una opción fuera de perfil, SIN `dado` y con `ef` neto positivo se
+//   resuelve tirando dados (umbral 8+). Sale (~42%) -> efecto ×1.15 + 60% puntos;
+//   rebota -> el efecto positivo se invierte. El dado se sintetiza solo; podés
+//   autorar la apuesta con `offDado:{exito,fracaso,...}` (formato dado) o
+//   `offEf:{exito:{...},fracaso:{...}}` (ef plano), y `noApuesta:true` la exime.
+//   Ver engine.js (esApuesta / sinteticoDado / resolverOpcion).
 //
 // Categorías (7): tecnologica · arriesgada · financiera · relacional ·
 //                 operativa · cultural · comercial
@@ -303,7 +309,13 @@ export const POOL = [
     narrativa:
       "El banco con el que operás te ofrece una línea a tasa subsidiada por ser cliente histórico. Plata barata, pero plata que hay que devolver. El gerente de cuentas insiste: «aprovechá ahora que el cupo está».",
     opciones: [
-      { id: "A", texto: "Tomarla entera y financiar capital de trabajo.", cat: "financiera", ef: { caja: 14, confianza: -4 }, resist: 5 },
+      {
+        id: "A", texto: "Tomarla entera y financiar capital de trabajo.", cat: "financiera", ef: { caja: 14, confianza: -4 }, resist: 5,
+        offDado: {
+          exito: { ef: { caja: 18, confianza: -2 }, nota: "El crédito barato financió el capital de trabajo justo: rindió sin asfixiar." },
+          fracaso: { ef: { caja: -12, motivacion: -4 }, nota: "La cuota empezó a correr antes que el retorno: la deuda te quedó grande." },
+        },
+      },
       {
         id: "B", texto: "Tomar la mitad y destinarla a un proyecto de mejora.", cat: "operativa",
         ef: { caja: 4 }, rel: "caja",
@@ -335,7 +347,13 @@ export const POOL = [
           pifia: { ef: { caja: -10, confianza: -8 }, nota: "Un cliente se siente expuesto: «¿estás vendiendo mis números?». Mal trago reputacional." },
         },
       },
-      { id: "B", texto: "Usar los datos solo puertas adentro para asesorar mejor.", cat: "relacional", ef: { confianza: 8, adopcion: 4, caja: -3 } },
+      {
+        id: "B", texto: "Usar los datos solo puertas adentro para asesorar mejor.", cat: "relacional", ef: { confianza: 8, adopcion: 4, caja: -3 },
+        offDado: {
+          exito: { ef: { confianza: 12, adopcion: 7 }, nota: "Usaste los datos para asesorar mejor y los clientes lo notaron: más confianza, cero ruido." },
+          fracaso: { ef: { confianza: -5, motivacion: -3 }, nota: "Te trabaste en planillas y la asesoría no mejoró: esfuerzo sin enganche." },
+        },
+      },
       { id: "C", texto: "Dejarlo: no es nuestro negocio.", cat: "operativa", ef: { caja: 2, motivacion: -3 } },
     ],
     concepto: "Los datos como activo estratégico. El nuevo negocio vale tanto como la confianza que lo sostiene.",
@@ -373,7 +391,13 @@ export const POOL = [
     narrativa:
       "El equipo sabe vender, pero le cuesta el sistema nuevo. RR.HH. propone un plan de capacitación serio: horas, plata y a alguien que lo lleve adelante. Otros dicen que «se aprende sobre la marcha».",
     opciones: [
-      { id: "A", texto: "Plan formal con horario protegido y un referente interno.", cat: "cultural", ef: { caja: -8, adopcion: 8, motivacion: 8 } },
+      {
+        id: "A", texto: "Plan formal con horario protegido y un referente interno.", cat: "cultural", ef: { caja: -8, adopcion: 8, motivacion: 8 },
+        offDado: {
+          exito: { ef: { adopcion: 12, motivacion: 11 }, nota: "El plan con horario protegido prendió: el equipo al fin le perdió el miedo al sistema." },
+          fracaso: { ef: { adopcion: -4, motivacion: -5, caja: -4 }, nota: "Mucha hora invertida y poca práctica real: el plan quedó en PowerPoint." },
+        },
+      },
       { id: "B", texto: "Tutoriales cortos y que cada uno avance a su ritmo.", cat: "operativa", ef: { adopcion: 6, caja: -2 } },
       {
         id: "C", texto: "Gamificar: ranking de adopción con premios para el equipo.", cat: "tecnologica",

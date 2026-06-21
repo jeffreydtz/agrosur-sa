@@ -3,7 +3,7 @@
 // ============================================================
 import { useState } from "react";
 import { ARQUETIPOS, INDICADORES, MISIONES } from "../data.js";
-import { tirarDados, resolverOpcion, resolverEvento, resolverEventoMenor, aplicarGolpe } from "../engine.js";
+import { tirarDados, resolverOpcion, resolverEvento, resolverEventoMenor, aplicarGolpe, esApuesta } from "../engine.js";
 import { getMeta } from "../meta.js";
 import { sfx } from "../sound.js";
 import { Dado, Efectos, Opcion } from "./ui.jsx";
@@ -74,7 +74,7 @@ export function ComoJugar({ onSiguiente, onVolver }) {
         <ol className="cj-lista">
           <li>Gestionás AgroSur S.A. durante <b>13 rondas</b>, con un <b>mazo distinto cada partida</b>. Cada ronda presenta una situación con <b>3 opciones</b> — y entre rondas pueden caer <b>titulares sorpresa</b>.</li>
           <li>Tus decisiones suben ⬆️ o bajan ⬇️ los <b>4 indicadores</b>: 💰 Caja, 🤝 Confianza, ⚙️ Adopción y 🔥 Motivación.</li>
-          <li>Cada empresa tiene un <b>perfil</b>: las decisiones de tu fuerte son <b>confiables</b>; las que están <b>fuera de perfil</b> son más difíciles, pero si salen bien <b>suman más</b>.</li>
+          <li>Cada empresa tiene un <b>perfil</b>: las decisiones de tu fuerte son <b>confiables</b>. Las que están <b>fuera de perfil</b> son una <b>apuesta 🎲</b>: tirás dados — si sale, ganás más fuerte (<b>+60% puntos</b>); si <b>rebota</b>, te cuesta.</li>
           <li>Las opciones con <b>🎲</b> tiran <b>dos dados</b>: con <b>7+</b> sale bien. Si el indicador relacionado está <b className="rojo-txt">en rojo (&lt;30)</b>, necesitás <b>9+</b>. <b>Doble 6 es CRÍTICO ★</b>; <b>doble 1 es PIFIA ☠</b>.</li>
           <li>Encadenar rondas positivas arma una <b>🔥 racha</b> que multiplica tus puntos. Tu arquetipo trae <b>🎯 2 misiones</b> propias.</li>
           <li>Si la 💰 Caja llega a 0 o la 🤝 Confianza cae a 10, la partida termina antes.</li>
@@ -193,7 +193,7 @@ export function ArquetipoSelect({ titulo, permitirAzar, onElegir, jugadorNum, mo
           <span>Récord <b>{meta.mejorPuntaje}</b></span>
           <span>Finales <b>{meta.finalesVistos.length}/7</b></span>
           <span>Arquetipos ganados <b>{meta.arquetiposGanados.length}/6</b></span>
-          <span>Logros <b>{Object.keys(meta.logros).length}/13</b></span>
+          <span>Logros <b>{Object.keys(meta.logros).length}/14</b></span>
         </div>
       )}
     </div>
@@ -221,7 +221,8 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
   function elegir(opcion) {
     if (fase !== "elegir") return;
     sfx.click();
-    if (opcion.dado) {
+    // Apuesta fuera de perfil: aunque no tenga dado propio, se resuelve tirando.
+    if (opcion.dado || esApuesta(estado, opcion)) {
       const roll = tirarDados();
       const { estado: ns, resultado } = resolverOpcion(estado, carta, opcion, roll);
       setPend({ estado: ns, detalle: resultado, opcion });
@@ -240,7 +241,7 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
     const d = pend.detalle.dado;
     if (d.critico) { sfx.critico(); setConfetti((c) => c + 1); }
     else if (d.pifia) sfx.pifia();
-    else if (d.exito) sfx.diceExito();
+    else if (d.exito) { sfx.diceExito(); if (pend.detalle.apuesta) setConfetti((c) => c + 1); }
     else if (d.casiExito) sfx.casiExito();
     else sfx.diceFracaso();
     if (pend.detalle.rachaRota) sfx.rachaRota();

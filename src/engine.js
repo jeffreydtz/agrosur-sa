@@ -37,6 +37,17 @@ export function esOffProfile(estado, opcion) {
 // Bonus de puntaje cuando una jugada fuera de perfil sale bien
 const OFF_PROFILE_BONUS_MULT = 1.6;
 
+// --- Apuesta fuera de perfil ---------------------------------------------
+// Una opción FUERA de perfil, SIN dado y con efecto neto positivo deja de ser
+// un bonus gratis: el motor la convierte en una tirada 2d6 (umbral 8+ por el
+// +1 off-profile). Sale bien (~42%) -> el efecto base ×1.15 + el ×1.6 de
+// puntos (ahora ganado). Rebota -> sólo los positivos se invierten ×-0.6,
+// con un piso de castigo al indicador líder y un poco de resistencia oculta.
+const OFF_GAMBLE_EXITO_SCALE = 1.15;   // amplifica el efecto base al ganar
+const OFF_GAMBLE_FRACASO_SCALE = -0.6; // invierte sólo los positivos al perder
+const OFF_GAMBLE_FRACASO_FLOOR = -4;   // castigo extra al indicador líder
+const OFF_GAMBLE_FRACASO_RESIST = 4;   // sube resistencia oculta al rebotar
+
 // Estado inicial de una empresa según arquetipo
 export function nuevoEstado(arqId, nombreJugador) {
   const a = ARQUETIPOS.find((x) => x.id === arqId) || ARQUETIPOS[0];
@@ -156,6 +167,66 @@ function escalarRama(rama, factor) {
   return out;
 }
 
+// ¿La suma de los 4 visibles de un ef es positiva?
+function netoPositivo(ef) {
+  if (!ef) return false;
+  return VISIBLES.reduce((a, k) => a + (ef[k] || 0), 0) > 0;
+}
+
+// Indicador líder de un ef: el visible de mayor magnitud absoluta.
+function relInferido(ef) {
+  if (!ef) return null;
+  let best = null, mag = 0;
+  for (const k of VISIBLES) {
+    const v = Math.abs(ef[k] || 0);
+    if (v > mag) { mag = v; best = k; }
+  }
+  return best;
+}
+
+// Convierte un {exito, fracaso} de ef plano (offEf autorado) en un dado normal.
+function normalizarOffEf(offEf) {
+  if (!offEf) return null;
+  return { exito: { ef: { ...offEf.exito } }, fracaso: { ef: { ...offEf.fracaso } } };
+}
+
+// Dado sintético para una apuesta fuera de perfil a partir de un ef positivo.
+// exito = ef ×1.15. fracaso = sólo los positivos ×-0.6, +piso al líder, +resist.
+// critico/pifia quedan undefined: el motor ya sintetiza las colas (escalarRama).
+function sinteticoDado(opcion) {
+  const ef = opcion.ef || {};
+  const exito = escalarRama({ ef }, OFF_GAMBLE_EXITO_SCALE);
+  const fracaso = { ef: {} };
+  for (const k of VISIBLES) {
+    if ((ef[k] || 0) > 0) fracaso.ef[k] = Math.floor(ef[k] * OFF_GAMBLE_FRACASO_SCALE);
+  }
+  const lider = relInferido(ef);
+  if (lider) fracaso.ef[lider] = (fracaso.ef[lider] || 0) + OFF_GAMBLE_FRACASO_FLOOR;
+  fracaso.resist = OFF_GAMBLE_FRACASO_RESIST;
+  return { exito, fracaso };
+}
+
+// El dado (autorado o sintético) que usaría una apuesta de esta opción.
+function dadoApuesta(opcion) {
+  return opcion.offDado || normalizarOffEf(opcion.offEf) || sinteticoDado(opcion);
+}
+
+// ¿Esta opción se resuelve como apuesta? (off-profile, sin dado propio, ef
+// neto positivo, no exenta). Las apuestas exigen tirar dados en la UI.
+export function esApuesta(estado, opcion) {
+  return !!opcion && !opcion.dado && !opcion.noApuesta &&
+    esOffProfile(estado, opcion) && netoPositivo(opcion.ef);
+}
+
+// Previsualización para la UI: ramas y umbral de una apuesta (sin tirar).
+// off-profile siempre suma +1 al umbral (la apuesta exige off-profile).
+export function previsualizarApuesta(estado, opcion) {
+  const dado = dadoApuesta(opcion);
+  const rel = opcion.rel || relInferido(opcion.ef);
+  const umbral = umbralDado(estado, rel, (opcion.umbralMod || 0) + 1);
+  return { exito: dado.exito.ef, fracaso: dado.fracaso.ef, umbral, rel };
+}
+
 // Misiones: chequea las del arquetipo y devuelve {estado, nuevas}
 // finalCtx: null durante la partida; {valor} al cierre (evalúa las `final: true`)
 export function chequearMisiones(estado, finalCtx = null) {
@@ -184,32 +255,38 @@ export function resolverOpcion(estado, carta, opcion, roll) {
   const antes = snapshot(estado);
   let s = { ...estado };
   const offProfile = esOffProfile(estado, opcion); // fuera de perfil del arquetipo
+  const apuesta = esApuesta(estado, opcion);       // off-profile sin dado y con ef+ => se vuelve tirada
+  // En una apuesta el efecto determinista deja de aplicarse fijo: pasa a ser la
+  // rama de éxito de un dado (autorado vía offDado/offEf, o sintético).
+  const op = apuesta
+    ? { ...opcion, dado: dadoApuesta(opcion), rel: opcion.rel || relInferido(opcion.ef), ef: undefined }
+    : opcion;
   const detalle = {
     cartaId: carta.id, cartaTitulo: carta.titulo, ronda: carta.ronda,
     opcionId: opcion.id, opcionTexto: opcion.texto, cat: opcion.cat,
   };
 
-  // 1) costo / efecto base siempre se aplica
-  s = aplicarEfectos(s, opcion.ef);
-  if (opcion.resist) s = aplicarResistencia(s, opcion.resist);
-  if (opcion.flag) s = agregarFlags(s, opcion.flag);
+  // 1) costo / efecto base siempre se aplica (en una apuesta, op.ef es undefined: no aplica fijo)
+  s = aplicarEfectos(s, op.ef);
+  if (op.resist) s = aplicarResistencia(s, op.resist);
+  if (op.flag) s = agregarFlags(s, op.flag);
 
-  // 2) dado (con críticos y pifias)
-  if (opcion.dado) {
+  // 2) dado (con críticos y pifias). En una apuesta, op.dado es el dado sintético/autorado.
+  if (op.dado) {
     const { d1, d2, total } = roll;
     // Fuera de perfil => +1 al umbral (más difícil). Stackea con umbralMod de variantes.
-    const umbral = umbralDado(estado, opcion.rel, (opcion.umbralMod || 0) + (offProfile ? 1 : 0));
+    const umbral = umbralDado(estado, op.rel, (op.umbralMod || 0) + (offProfile ? 1 : 0));
     const critico = total === 12; // doble 6
     const pifia = total === 2;    // doble 1
     const exito = critico ? true : pifia ? false : total >= umbral;
     let rama;
     if (critico) {
-      rama = opcion.dado.critico || escalarRama(opcion.dado.exito, 1.5);
+      rama = op.dado.critico || escalarRama(op.dado.exito, 1.5);
     } else if (pifia) {
-      rama = opcion.dado.pifia ||
-        { ...escalarRama(opcion.dado.fracaso, 1.5), resist: (escalarRama(opcion.dado.fracaso, 1.5).resist || 0) + 5 };
+      rama = op.dado.pifia ||
+        { ...escalarRama(op.dado.fracaso, 1.5), resist: (escalarRama(op.dado.fracaso, 1.5).resist || 0) + 5 };
     } else {
-      rama = exito ? opcion.dado.exito : opcion.dado.fracaso;
+      rama = exito ? op.dado.exito : op.dado.fracaso;
     }
     s = aplicarEfectos(s, rama.ef);
     if (rama.resist) s = aplicarResistencia(s, rama.resist);
@@ -218,7 +295,7 @@ export function resolverOpcion(estado, carta, opcion, roll) {
       roll: total, d1, d2, umbral, exito, critico, pifia,
       casiExito: !exito && !pifia && total === umbral - 1,
       justo: exito && !critico && total === umbral,
-      rel: opcion.rel, nota: rama.nota,
+      rel: op.rel, nota: rama.nota,
     };
   }
 
@@ -259,6 +336,8 @@ export function resolverOpcion(estado, carta, opcion, roll) {
   detalle.racha = s.racha;
   detalle.offProfile = offProfile;
   detalle.offProfileExito = offProfile && exitoEfectivo;
+  detalle.apuesta = apuesta;
+  detalle.offBackfire = apuesta && !!detalle.dado && !(detalle.dado.critico || detalle.dado.exito);
   // contadores de afinidad (sólo cuentan opciones categorizadas que salieron bien)
   if (opcion.cat && exitoEfectivo) {
     if (offProfile) s.offWins = (estado.offWins || 0) + 1;

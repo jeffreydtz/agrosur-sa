@@ -82,13 +82,15 @@ export function RachaChip({ racha }) {
 // --- Resumen de puntos tras resolver una ronda ---
 export function ResumenRonda({ resultado }) {
   if (!resultado) return null;
-  const { puntos, racha, rachaRota } = resultado;
+  const { puntos, racha, rachaRota, apuesta, offBackfire, offProfileExito } = resultado;
   return (
     <div className="resumen-ronda">
+      {apuesta && offProfileExito && <span className="resumen-apuesta-ok">🎲 ¡La apuesta salió!</span>}
+      {offBackfire && <span className="resumen-apuesta-mal">🎲 La apuesta rebotó</span>}
       {puntos > 0 && <span className="resumen-pts">+{puntos} pts</span>}
       {racha >= 2 && <span className="resumen-racha">🔥 Racha x{racha}</span>}
       {rachaRota && <span className="resumen-rota">💔 Racha rota</span>}
-      {puntos === 0 && !rachaRota && racha < 2 && <span className="resumen-neutro">Ronda dura. A remarla.</span>}
+      {puntos === 0 && !rachaRota && !offBackfire && racha < 2 && <span className="resumen-neutro">Ronda dura. A remarla.</span>}
     </div>
   );
 }

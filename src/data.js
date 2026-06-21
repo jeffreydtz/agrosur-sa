@@ -74,8 +74,9 @@ export const INDICADORES = {
 // las demás, después de cada resolución. test(estado, {valor}).
 // ============================================================
 // Misiones reworked: stat-based o por afinidad (offWins/onWins), logrables
-// con cualquier mazo random. offWins = decisiones fuera de perfil ganadas;
-// onWins = decisiones en perfil ganadas (ver engine.js resolverOpcion).
+// con cualquier mazo random. offWins = apuestas fuera de perfil ganadas (las
+// decisiones fuera de perfil ahora se resuelven tirando dados, ver engine.js
+// esApuesta/resolverOpcion); onWins = decisiones en perfil ganadas.
 export const MISIONES = {
   tradicional: [
     {
@@ -85,8 +86,8 @@ export const MISIONES = {
     },
     {
       id: "saltosinred", nombre: "Salto sin red",
-      desc: "Ganá 2 decisiones fuera de perfil (tech o arriesgadas).",
-      test: (s) => (s.offWins || 0) >= 2,
+      desc: "Ganá una apuesta fuera de tu perfil.",
+      test: (s) => (s.offWins || 0) >= 1,
     },
   ],
   endeudada: [

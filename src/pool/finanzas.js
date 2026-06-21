@@ -6,7 +6,13 @@ export const CARTAS_FINANZAS = [
     titulo: "El dólar se escapa",
     narrativa: "Don Raúl entra agitado: el blue saltó tres puntos antes del mediodía y hay cobranzas en pesos sin cerrar. La caja te mira y vos mirás la pizarra del Rosario.",
     opciones: [
-      { id: "A", texto: "Dolarizar la caja hoy mismo, sin chistar.", cat: "financiera", ef: { caja: 10, confianza: -3 } },
+      {
+        id: "A", texto: "Dolarizar la caja hoy mismo, sin chistar.", cat: "financiera", ef: { caja: 10, confianza: -3 },
+        offDado: {
+          exito: { ef: { caja: 14, confianza: -2 }, nota: "Clavaste el timing: dolarizaste justo antes del salto y la caja quedó blindada." },
+          fracaso: { ef: { caja: -8, motivacion: -3 }, nota: "Te apuraste con el dólar planchado: vendiste pesos baratos y comiste la diferencia." },
+        },
+      },
       { id: "B", texto: "Apurar cobranzas pendientes con descuento.", cat: "comercial", ef: { caja: 6, adopcion: 4 }, resist: 8 },
       {
         id: "C", texto: "Bancarte la posición en pesos y esperar.", cat: "arriesgada",
@@ -28,7 +34,13 @@ export const CARTAS_FINANZAS = [
     titulo: "Comisión o volumen",
     narrativa: "Un acopiador grande te ofrece todo su volumen si le bajás la comisión a la mitad. Marta hace números y la pizarra no cierra tan linda como suena.",
     opciones: [
-      { id: "A", texto: "Mantener la comisión de siempre.", cat: "financiera", ef: { caja: 4, confianza: 4 } },
+      {
+        id: "A", texto: "Mantener la comisión de siempre.", cat: "financiera", ef: { caja: 4, confianza: 4 },
+        offDado: {
+          exito: { ef: { caja: 8, confianza: 6 }, nota: "Te plantaste con tu comisión y el acopiador igual volvió: valés lo que cobrás." },
+          fracaso: { ef: { caja: -6, confianza: -4 }, nota: "El acopiador se ofendió y se llevó el volumen a la competencia." },
+        },
+      },
       { id: "B", texto: "Bajar comisión y ganar la cuenta entera.", cat: "comercial", ef: { caja: -2, adopcion: 8 }, flag: "cuentaGrande" },
       {
         id: "C", texto: "Comisión baja, pero con cláusula de exclusividad.", cat: "relacional",
@@ -49,7 +61,13 @@ export const CARTAS_FINANZAS = [
     narrativa: "Vence la línea de descubierto y el banco te tienta con refinanciar a tasa cara. Don Ernesto, de la vieja escuela, dice que la deuda buena no existe.",
     opciones: [
       { id: "A", texto: "Cancelar con caja propia y quedar limpio.", cat: "financiera", ef: { caja: -10, confianza: 6 } },
-      { id: "B", texto: "Refinanciar y conservar liquidez operativa.", cat: "operativa", ef: { caja: 8, motivacion: -3 }, resist: 10 },
+      {
+        id: "B", texto: "Refinanciar y conservar liquidez operativa.", cat: "operativa", ef: { caja: 8, motivacion: -3 }, resist: 10,
+        offDado: {
+          exito: { ef: { caja: 12 }, nota: "Refinanciaste justo y la liquidez te salvó el trimestre." },
+          fracaso: { ef: { caja: -9, motivacion: -4 }, nota: "La tasa cara te comió el aire: pagás más por bastante menos." },
+        },
+      },
       {
         id: "C", texto: "Negociar quita pateando el mostrador.", cat: "arriesgada",
         ef: { caja: -2 }, rel: "caja",
@@ -90,7 +108,13 @@ export const CARTAS_FINANZAS = [
     titulo: "Costos que carcomen",
     narrativa: "Cierra el trimestre y los costos fijos se comieron el margen como gorgojo en silo. Don Raúl quiere recortar gente; Marta dice que el problema son los fletes mal cotizados.",
     opciones: [
-      { id: "A", texto: "Renegociar fletes y proveedores uno por uno.", cat: "operativa", ef: { caja: 7, adopcion: 4 }, resist: 7 },
+      {
+        id: "A", texto: "Renegociar fletes y proveedores uno por uno.", cat: "operativa", ef: { caja: 7, adopcion: 4 }, resist: 7,
+        offDado: {
+          exito: { ef: { caja: 12, adopcion: 6 }, nota: "Apretaste flete por flete y el margen volvió a respirar." },
+          fracaso: { ef: { caja: -7, confianza: -4 }, nota: "Dos proveedores se cansaron de la pulseada y te cortaron el servicio." },
+        },
+      },
       { id: "B", texto: "Recorte parejo de gastos administrativos.", cat: "financiera", ef: { caja: 9, motivacion: -6 } },
       {
         id: "C", texto: "Apostar a un sistema de costeo por cliente.", cat: "tecnologica",

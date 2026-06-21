@@ -26,6 +26,11 @@ export const LOGROS = [
     desc: "Ganate a Don Raúl: padrino del sistema y tribus integradas.",
     test: (c) => c.estado.flags.includes("padrino:si") && c.estado.flags.includes("tribus:integradas"),
   },
+  {
+    id: "apostador", emoji: "🎲", nombre: "Corazón de ruleta", fase: "partida",
+    desc: "Ganá 3 apuestas fuera de tu perfil en una partida.",
+    test: (c) => (c.estado.offWins || 0) >= 3,
+  },
   // --- al cierre ---
   {
     id: "primera", emoji: "🪴", nombre: "Primer día en la oficina", fase: "final",

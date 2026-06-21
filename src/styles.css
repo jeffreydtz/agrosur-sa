@@ -188,6 +188,13 @@ body::before{
 .rama-exito .rama-label{color:var(--verde)}
 .rama-fracaso .rama-label{color:var(--rojo)}
 
+/* ---------- Apuesta fuera de perfil ---------- */
+.opcion-apuesta{background:linear-gradient(180deg,#f4ecdd,#efe5cf);border-color:#e0b13a}
+.opcion-apuesta:hover{border-color:var(--caja);box-shadow:-4px 0 0 var(--caja),0 4px 14px rgba(0,0,0,.12)}
+.cat-hint-apuesta{color:#b07d10}
+.apuesta-badge{background:var(--caja);color:#3a2c06}
+.opcion-apuesta-info{border-top:1px dashed #d8c79a;padding-top:8px}
+
 /* ---------- Chips de efecto ---------- */
 .efectos{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
 .chip{display:inline-flex;align-items:center;gap:3px;border:1.5px solid var(--c);border-radius:20px;padding:2px 9px 2px 7px;background:color-mix(in srgb,var(--c) 12%,transparent)}
@@ -408,6 +415,8 @@ body::before{
 .resumen-racha{color:var(--motivacion);background:rgba(232,105,60,.12);border:1.5px solid var(--motivacion);border-radius:18px;padding:3px 11px}
 .resumen-rota{color:var(--ink-soft);background:rgba(0,0,0,.06);border:1.5px dashed #c3b89b;border-radius:18px;padding:3px 11px}
 .resumen-neutro{color:var(--ink-soft);font-weight:400;font-style:italic;font-family:var(--serif)}
+.resumen-apuesta-ok{color:var(--verde);background:rgba(90,158,63,.14);border:1.5px solid var(--verde);border-radius:18px;padding:3px 11px;animation:ptsPop .4s ease}
+.resumen-apuesta-mal{color:var(--rojo);background:rgba(207,113,89,.12);border:1.5px solid var(--rojo);border-radius:18px;padding:3px 11px}
 
 /* ---------- Concepto colapsable ---------- */
 .concepto-box{cursor:pointer}

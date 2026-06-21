@@ -13,6 +13,10 @@ export const CARTAS_OPERACIONES = [
         cat: "operativa",
         ef: { caja: -5, confianza: 9 },
         resist: 8,
+        offDado: {
+          exito: { ef: { caja: -3, confianza: 13 }, nota: "Parar la playa molestó, pero la balanza prolija te ganó respeto en la zona." },
+          fracaso: { ef: { confianza: -6, motivacion: -5 }, nota: "Frenaste la descarga en plena cosecha gruesa: bronca de camioneros y productores." },
+        },
       },
       {
         id: "B",
@@ -105,6 +109,10 @@ export const CARTAS_OPERACIONES = [
         texto: "Implementar turnos de carga coordinados por WhatsApp con la terminal.",
         cat: "operativa",
         ef: { caja: -4, adopcion: 10, confianza: 5 },
+        offDado: {
+          exito: { ef: { adopcion: 14, confianza: 8 }, nota: "Los turnos por WhatsApp ordenaron la cola: los fleteros al fin saben cuándo venir." },
+          fracaso: { ef: { adopcion: -5, motivacion: -4 }, nota: "Nadie respetó los turnos y el grupo de WhatsApp terminó en quilombo." },
+        },
       },
       {
         id: "B",
@@ -154,6 +162,10 @@ export const CARTAS_OPERACIONES = [
         texto: "Instaurar una reunión diaria corta entre comercial y operaciones.",
         cat: "cultural",
         ef: { motivacion: 8, confianza: 7, caja: -2 },
+        offDado: {
+          exito: { ef: { motivacion: 11, confianza: 10 }, nota: "La reunión corta destrabó todo: comercial y operaciones al fin hablan el mismo idioma." },
+          fracaso: { ef: { motivacion: -6, caja: -3 }, nota: "La reunión se volvió catarsis: cada uno defendiendo su quinta, media hora perdida por día." },
+        },
       },
       {
         id: "B",

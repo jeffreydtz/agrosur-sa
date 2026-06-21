@@ -6,7 +6,7 @@
 const KEY = "agrosur.v1";
 
 const DEFAULT = {
-  version: 1,
+  version: 2,
   muted: false,
   partidas: 0,
   mejorPuntaje: 0,
@@ -23,6 +23,14 @@ export function getMeta() {
   try {
     const raw = localStorage.getItem(KEY);
     cache = raw ? { ...DEFAULT, ...JSON.parse(raw) } : { ...DEFAULT };
+    if (cache.version < 2) {
+      // v2: la "apuesta fuera de perfil" cambió la economía de puntos. Los
+      // récords viejos se hicieron con el +60% gratis -> borrón y cuenta nueva.
+      cache.mejorPuntaje = 0;
+      cache.mejorValor = 0;
+      cache.version = 2;
+      save();
+    }
   } catch {
     cache = { ...DEFAULT };
   }
