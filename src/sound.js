@@ -70,22 +70,31 @@ function noise(dur, { gain = 0.12, when = 0, freq = 800 } = {}) {
   src.start(t0);
 }
 
+// --- háptica (móvil): vibración corta acompañando los golpes fuertes ---
+function buzz(patron) {
+  try {
+    if (navigator.vibrate) navigator.vibrate(patron);
+  } catch { /* sin soporte */ }
+}
+
 // --- efectos del juego ---
 export const sfx = {
   click() { tone(640, 0.06, { type: "triangle", gain: 0.1 }); },
   carta() { noise(0.12, { gain: 0.08, freq: 1800 }); },
   diceTick(i = 0) { noise(0.03, { gain: 0.09, freq: 2400 - i * 60 }); tone(900 - i * 18, 0.03, { type: "square", gain: 0.04 }); },
-  diceExito() { tone(523, 0.12, { type: "triangle" }); tone(659, 0.12, { type: "triangle", when: 0.09 }); tone(784, 0.22, { type: "triangle", when: 0.18 }); },
+  thunk() { noise(0.06, { gain: 0.16, freq: 420 }); tone(150, 0.09, { type: "sine", gain: 0.14, slide: -40 }); buzz(14); },
+  diceExito() { tone(523, 0.12, { type: "triangle" }); tone(659, 0.12, { type: "triangle", when: 0.09 }); tone(784, 0.22, { type: "triangle", when: 0.18 }); buzz(24); },
   diceFracaso() { tone(220, 0.2, { type: "sawtooth", gain: 0.12 }); tone(208, 0.3, { type: "sawtooth", gain: 0.12, when: 0.12 }); },
   critico() {
     tone(523, 0.1, { type: "triangle" }); tone(659, 0.1, { type: "triangle", when: 0.07 });
     tone(784, 0.1, { type: "triangle", when: 0.14 }); tone(1047, 0.3, { type: "triangle", when: 0.21 });
     tone(2093, 0.18, { type: "sine", gain: 0.08, when: 0.26 });
+    buzz([20, 40, 20, 40, 90]);
   },
-  pifia() { tone(110, 0.35, { type: "sawtooth", gain: 0.16, slide: -40 }); noise(0.25, { gain: 0.1, freq: 300, when: 0.05 }); },
+  pifia() { tone(110, 0.35, { type: "sawtooth", gain: 0.16, slide: -40 }); noise(0.25, { gain: 0.1, freq: 300, when: 0.05 }); buzz([70, 50, 70]); },
   casiExito() { tone(440, 0.14, { type: "triangle" }); tone(392, 0.25, { type: "triangle", when: 0.14 }); },
   evento() { tone(392, 0.18, { type: "triangle" }); tone(554, 0.3, { type: "triangle", when: 0.12 }); },
-  golpe() { tone(150, 0.3, { type: "sawtooth", gain: 0.14, slide: -60 }); },
+  golpe() { tone(150, 0.3, { type: "sawtooth", gain: 0.14, slide: -60 }); buzz(45); },
   toast() { tone(1320, 0.1, { type: "sine", gain: 0.1 }); tone(1760, 0.18, { type: "sine", gain: 0.08, when: 0.08 }); },
   mision() { tone(660, 0.1, { type: "triangle" }); tone(880, 0.1, { type: "triangle", when: 0.08 }); tone(1320, 0.22, { type: "triangle", when: 0.16 }); },
   racha(n = 3) { const base = 392 * Math.pow(1.122, Math.min(n, 6)); tone(base, 0.09, { type: "triangle" }); tone(base * 1.5, 0.14, { type: "triangle", when: 0.07 }); },
@@ -93,6 +102,7 @@ export const sfx = {
   fanfarria() {
     [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, { type: "triangle", when: i * 0.11 }));
     tone(1319, 0.4, { type: "triangle", when: 0.46 });
+    buzz([30, 60, 30, 60, 120]);
   },
   tickTally() { tone(880, 0.025, { type: "square", gain: 0.05 }); },
   record() { [659, 784, 988, 1319, 1568].forEach((f, i) => tone(f, 0.14, { type: "triangle", when: i * 0.09 })); },

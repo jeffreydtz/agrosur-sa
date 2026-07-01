@@ -34,34 +34,71 @@ function Toast({ toast, onDone }) {
 }
 
 // --- Confetti CSS (críticos y grandes victorias) ---
-const CONF_COLORS = ["#e0b13a", "#34a0a4", "#5a9e3f", "#cf7359", "#f5f0e4", "#e8693c"];
-export function Confetti({ seed = 1 }) {
+const CONF_COLORS = ["#eec158", "#3ec2b7", "#5a9e3f", "#cf7359", "#f7f2e5", "#e8693c"];
+export function Confetti({ seed = 1, denso = false }) {
   const piezas = useMemo(
     () =>
-      Array.from({ length: 26 }, (_, i) => ({
+      Array.from({ length: denso ? 44 : 30 }, (_, i) => ({
         left: ((i * 37 + seed * 13) % 100),
-        delay: ((i * 53) % 40) / 100,
-        dur: 1.1 + ((i * 29) % 60) / 100,
+        delay: ((i * 53) % 60) / 100,
+        dur: 1.3 + ((i * 29) % 80) / 100,
         color: CONF_COLORS[i % CONF_COLORS.length],
-        rot: (i * 47) % 360,
+        sway: 6 + ((i * 19) % 16),
+        circulo: i % 3 === 0,
         size: 6 + ((i * 31) % 7),
       })),
-    [seed]
+    [seed, denso]
   );
   return (
     <div className="confetti" aria-hidden="true">
       {piezas.map((p, i) => (
         <span
           key={i}
-          className="confetti-pieza"
+          className={"confetti-pieza" + (p.circulo ? " confetti-circulo" : "")}
           style={{
             left: p.left + "%",
             animationDelay: p.delay + "s",
             animationDuration: p.dur + "s",
             background: p.color,
             width: p.size,
-            height: p.size * 0.6,
-            transform: `rotate(${p.rot}deg)`,
+            height: p.circulo ? p.size : p.size * 0.6,
+            "--sw": p.sway + "px",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// --- Burst radial de chispas (crítico, apuesta ganada) ---
+const BURST_COLORS = ["#eec158", "#ffe9a8", "#3ec2b7", "#f7f2e5", "#e8693c"];
+export function Burst({ seed = 1, n = 20 }) {
+  const chispas = useMemo(
+    () =>
+      Array.from({ length: n }, (_, i) => {
+        const ang = (i / n) * Math.PI * 2 + (seed % 7) * 0.31;
+        const dist = 64 + ((i * 37 + seed * 11) % 56);
+        return {
+          dx: Math.cos(ang) * dist,
+          dy: Math.sin(ang) * dist * 0.85,
+          color: BURST_COLORS[i % BURST_COLORS.length],
+          size: 5 + ((i * 13) % 5),
+          delay: (i % 5) * 0.025,
+        };
+      }),
+    [seed, n]
+  );
+  return (
+    <div className="burst" aria-hidden="true">
+      {chispas.map((c, i) => (
+        <span
+          key={i}
+          style={{
+            "--dx": c.dx + "px",
+            "--dy": c.dy + "px",
+            "--c": c.color,
+            "--s": c.size + "px",
+            "--del": c.delay + "s",
           }}
         />
       ))}

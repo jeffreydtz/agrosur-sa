@@ -8,6 +8,35 @@ import { estadoColor, umbralDado, esApuesta, previsualizarApuesta } from "../eng
 import { sfx } from "../sound.js";
 import { RachaChip } from "./juice.jsx";
 
+// --- Tilt 3D con mouse (solo punteros finos; setea --rx/--ry/--mx/--my) ---
+export function useTilt(max = 5) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !window.matchMedia("(pointer:fine)").matches) return;
+    const move = (e) => {
+      const r = el.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      el.style.setProperty("--rx", (-py * max).toFixed(2) + "deg");
+      el.style.setProperty("--ry", (px * max).toFixed(2) + "deg");
+      el.style.setProperty("--mx", ((px + 0.5) * 100).toFixed(1) + "%");
+      el.style.setProperty("--my", ((py + 0.5) * 100).toFixed(1) + "%");
+    };
+    const leave = () => {
+      el.style.setProperty("--rx", "0deg");
+      el.style.setProperty("--ry", "0deg");
+    };
+    el.addEventListener("mousemove", move);
+    el.addEventListener("mouseleave", leave);
+    return () => {
+      el.removeEventListener("mousemove", move);
+      el.removeEventListener("mouseleave", leave);
+    };
+  }, [max]);
+  return ref;
+}
+
 // --- Chip de efecto (flecha) ---
 export function Chip({ k, v }) {
   const ind = INDICADORES[k];
@@ -30,7 +59,7 @@ export function Efectos({ ef }) {
   return <span className="efectos">{chips.map((k) => <Chip key={k} k={k} v={ef[k]} />)}</span>;
 }
 
-// --- Una barra de indicador (con delta flotante) ---
+// --- Una barra de indicador (con delta flotante y ticks de umbral) ---
 export function Barra({ k, valor, delta, seq }) {
   const ind = INDICADORES[k];
   const estado = estadoColor(valor);
@@ -50,11 +79,32 @@ export function Barra({ k, valor, delta, seq }) {
         </span>
       </div>
       <div className="barra-track">
+        <span className="barra-tick" style={{ left: "30%" }} />
+        <span className="barra-tick" style={{ left: "60%" }} />
         <div
           className={"barra-fill " + (delta != null && delta !== 0 ? (delta > 0 ? "fill-flash-up" : "fill-flash-down") : "")}
-          style={{ width: valor + "%", background: fillColor }}
+          style={{ width: valor + "%", "--bc": fillColor }}
         />
       </div>
+    </div>
+  );
+}
+
+// --- Viaje de la partida: un nodo por ronda ---
+function Journey({ ronda, total }) {
+  const media = String(ronda).includes("½");
+  const n = parseInt(ronda, 10) || 0;
+  return (
+    <div className="journey" aria-hidden="true" title={"Ronda " + ronda + " de " + total}>
+      {Array.from({ length: total }, (_, i) => {
+        const num = i + 1;
+        const clase =
+          num < n || (num === n && media) ? "j-done"
+          : num === n ? "j-cur"
+          : num === n + 1 && media ? "j-next"
+          : "";
+        return <span key={num} className={"journey-dot " + clase} />;
+      })}
     </div>
   );
 }
@@ -70,7 +120,9 @@ export function Tablero({ estado, ronda, totalRondas, etiqueta, fx }) {
           <span className="tablero-emoji">{estado.arqEmoji}</span>
           <div>
             <div className="tablero-nombre">{estado.nombreJugador}</div>
-            <div className="tablero-arq">{etiqueta || estado.arqNombre}</div>
+            <div className="tablero-arq">
+              {etiqueta || (estado.nombreJugador !== estado.arqNombre ? estado.arqNombre : "AgroSur S.A.")}
+            </div>
           </div>
         </div>
         <RachaChip racha={estado.racha} />
@@ -83,6 +135,7 @@ export function Tablero({ estado, ronda, totalRondas, etiqueta, fx }) {
           <span className="ronda-num">{ronda}<span className="ronda-tot">/{totalRondas}</span></span>
         </div>
       </div>
+      <Journey ronda={ronda} total={totalRondas} />
       <div className="tablero-barras">
         <Barra k="caja" valor={estado.caja} delta={deltas.caja} seq={seq} />
         <Barra k="confianza" valor={estado.confianza} delta={deltas.confianza} seq={seq} />
@@ -93,13 +146,16 @@ export function Tablero({ estado, ronda, totalRondas, etiqueta, fx }) {
   );
 }
 
-// --- Par de dados 2d6 (giran, el primero clava y el segundo estira la tensión) ---
+// ============================================================
+// Dados 3D (2d6): cubos reales que ruedan, frenan y clavan.
+// El primero clava antes; el segundo estira el suspenso.
+// ============================================================
 const PIPS = {
   1: [5], 2: [3, 7], 3: [3, 5, 7], 4: [1, 3, 7, 9],
   5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9],
 };
 
-function CaraD6({ valor }) {
+function CaraPips({ valor }) {
   return (
     <div className="d6-cara">
       {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((c) => (
@@ -109,53 +165,92 @@ function CaraD6({ valor }) {
   );
 }
 
+// cara frontal=1, trasera=6, derecha=2, izquierda=5, arriba=3, abajo=4
+const CARAS = [
+  { v: 1, clase: "cf" }, { v: 6, clase: "cb" },
+  { v: 2, clase: "cr" }, { v: 5, clase: "cl" },
+  { v: 3, clase: "ct" }, { v: 4, clase: "cd" },
+];
+
+// rotación [rx, ry] que deja el valor mirando al frente
+const ORIENT = { 1: [0, 0], 2: [0, -90], 3: [-90, 0], 4: [90, 0], 5: [0, 90], 6: [0, 180] };
+
+function targetTransform(valor, vueltasX, vueltasY) {
+  const [rx, ry] = ORIENT[valor];
+  return `rotateX(${rx - 360 * vueltasX}deg) rotateY(${ry + 360 * vueltasY}deg)`;
+}
+
+function CuboD6({ transform, dur, landing }) {
+  return (
+    <div className={"d6-escena" + (landing ? " d6-land" : "")}>
+      <div className="cubo" style={transform ? { transform, transitionDuration: dur + "s" } : undefined}>
+        {CARAS.map(({ v, clase }) => (
+          <div key={v} className={"cara3d " + clase}><CaraPips valor={v} /></div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const DUR1 = 1.15;  // segundos hasta que clava el primer dado
+const DUR2 = 2.0;   // el segundo estira el suspenso
+const PAUSA = 380;  // pausa dramática antes de revelar el resultado
+
 export function Dado({ rolling, valor, d1, d2, umbral, exito, critico, pifia, onDone }) {
-  const [caras, setCaras] = useState([d1 || 1, d2 || 1]);
-  const [girando, setGirando] = useState([false, false]);
+  // anim: transforms + duraciones actuales de cada cubo
+  const [anim, setAnim] = useState(() =>
+    rolling ? null : { t1: targetTransform(d1 || 1, 0, 0), t2: targetTransform(d2 || 1, 0, 0), dur1: 0, dur2: 0 }
+  );
+  const [landed, setLanded] = useState(rolling ? 0 : 2);
+  const timers = useRef([]);
+  const skipRef = useRef(false);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
-  const settleRef = useRef(null);
 
   useEffect(() => {
     if (!rolling) {
-      setCaras([d1 || 1, d2 || 1]);
-      setGirando([false, false]);
+      setAnim({ t1: targetTransform(d1 || 1, 0, 0), t2: targetTransform(d2 || 1, 0, 0), dur1: 0, dur2: 0 });
+      setLanded(2);
       return;
     }
-    let cancelado = false;
-    let timer = null;
-    let delay = 70;
-    let i = 0;
-    let fijado1 = false;
-    const rand = () => 1 + Math.floor(Math.random() * 6);
-    setGirando([true, true]);
-    const settle = () => {
-      if (cancelado) return;
-      cancelado = true;
-      clearTimeout(timer);
-      setCaras([d1, d2]);
-      setGirando([false, false]);
-      if (onDoneRef.current) onDoneRef.current();
-    };
-    settleRef.current = settle;
+    // ticks de sonido con cadencia decreciente mientras giran
+    let i = 0, delay = 70, cancel = false;
     const tick = () => {
-      if (cancelado) return;
-      setCaras((c) => [fijado1 ? d1 : rand(), rand()]);
+      if (cancel) return;
       sfx.diceTick(i++);
-      delay *= 1.12;
-      if (!fijado1 && delay >= 170) {
-        // el primer dado clava; el segundo acelera de nuevo y estira el suspenso
-        fijado1 = true;
-        delay = 90;
-        setCaras([d1, rand()]);
-        setGirando([false, true]);
-      }
-      if (delay < 240) timer = setTimeout(tick, delay);
-      else timer = setTimeout(settle, 430); // pausa dramática antes de revelar
+      delay *= 1.16;
+      if (delay < 320) timers.current.push(setTimeout(tick, delay));
     };
-    timer = setTimeout(tick, delay);
-    return () => { cancelado = true; clearTimeout(timer); };
+    timers.current.push(setTimeout(tick, delay));
+
+    const raf = requestAnimationFrame(() => {
+      setAnim({
+        t1: targetTransform(d1, 4, 3),
+        t2: targetTransform(d2, 5, 4),
+        dur1: DUR1, dur2: DUR2,
+      });
+    });
+    timers.current.push(setTimeout(() => { sfx.thunk(); setLanded(1); }, DUR1 * 1000));
+    timers.current.push(setTimeout(() => { sfx.thunk(); setLanded(2); }, DUR2 * 1000));
+    timers.current.push(setTimeout(() => { onDoneRef.current && onDoneRef.current(); }, DUR2 * 1000 + PAUSA));
+
+    return () => {
+      cancel = true;
+      cancelAnimationFrame(raf);
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
   }, [rolling, d1, d2]);
+
+  function apurar() {
+    if (!rolling || skipRef.current) return;
+    skipRef.current = true;
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    setAnim({ t1: targetTransform(d1, 1, 1), t2: targetTransform(d2, 1, 1), dur1: 0.22, dur2: 0.3 });
+    timers.current.push(setTimeout(() => { sfx.thunk(); setLanded(2); }, 320));
+    timers.current.push(setTimeout(() => { onDoneRef.current && onDoneRef.current(); }, 520));
+  }
 
   const estadoClase = rolling
     ? "dado-rolling"
@@ -164,23 +259,21 @@ export function Dado({ rolling, valor, d1, d2, umbral, exito, critico, pifia, on
     : exito === true ? "dado-exito"
     : exito === false ? "dado-fracaso" : "";
 
-  const suma = caras[0] + caras[1];
+  const total = (d1 || 1) + (d2 || 1);
 
   return (
     <div className="dado-wrap">
       <div
         className={"dados-par " + estadoClase}
-        onClick={() => rolling && settleRef.current && settleRef.current()}
+        onClick={apurar}
         title={rolling ? "Tocá para apurar los dados" : undefined}
       >
-        <div className={"dado-d6 " + (girando[0] ? "d6-girando" : "d6-quieto")}>
-          <CaraD6 valor={caras[0]} />
-        </div>
+        <CuboD6 transform={anim && anim.t1} dur={anim ? anim.dur1 : 0} landing={landed >= 1} />
         <span className="dados-mas">+</span>
-        <div className={"dado-d6 d6-segundo " + (girando[1] ? "d6-girando" : "d6-quieto")}>
-          <CaraD6 valor={caras[1]} />
-        </div>
-        <span className={"dados-total" + (rolling ? " total-rolling" : "")}>= {suma}</span>
+        <CuboD6 transform={anim && anim.t2} dur={anim ? anim.dur2 : 0} landing={landed >= 2} />
+        <span className={"dados-total" + (landed < 2 ? " total-rolling" : "")}>
+          {landed < 2 ? "= ?" : "= " + total}
+        </span>
       </div>
       {!rolling && exito != null && (
         <div className={"dado-result " + (critico ? "txt-critico" : pifia ? "txt-pifia" : exito ? "txt-exito" : "txt-fracaso")}>
@@ -196,7 +289,7 @@ export function Dado({ rolling, valor, d1, d2, umbral, exito, critico, pifia, on
 }
 
 // --- Botón de opción ---
-export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }) {
+export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada, indice = 0 }) {
   const esDado = !!opcion.dado;
   // Fuera de perfil: categoría que no está en la afinidad del arquetipo
   const off = !!(opcion.cat && !(AFIN_BY_ARQ[estado.arquetipo] || []).includes(opcion.cat));
@@ -215,6 +308,8 @@ export function Opcion({ opcion, estado, onElegir, deshabilitado, seleccionada }
       className={"opcion " + (esTirada ? "opcion-dado " : "") + (apuesta ? "opcion-apuesta " : "") + (seleccionada ? "opcion-sel " : "")}
       onClick={() => onElegir(opcion)}
       disabled={deshabilitado}
+      style={{ animationDelay: indice * 0.08 + "s" }}
+      title={"Atajo de teclado: " + opcion.id}
     >
       <div className="opcion-head">
         <span className="opcion-letra">{opcion.id}</span>

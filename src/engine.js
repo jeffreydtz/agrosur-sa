@@ -63,6 +63,8 @@ export function nuevoEstado(arqId, nombreJugador) {
     resistencia: a.resistencia, // OCULTO
     flags: [],
     log: [],          // historial de decisiones
+    // trayectoria de los 4 visibles, un snapshot por paso (para el gráfico final)
+    hist: [{ caja: a.caja, confianza: a.confianza, adopcion: a.adopcion, motivacion: a.motivacion, tag: "inicio", nombre: "Inicio" }],
     resistHist: [a.resistencia],
     terminado: false,
     motivoFin: null,  // 'quiebra' | 'exodo' | null
@@ -354,6 +356,7 @@ export function resolverOpcion(estado, carta, opcion, roll) {
 
   s = chequearFin(s);
   s.log = [...s.log, detalle];
+  s.hist = [...(estado.hist || []), { ...snapshot(s), tag: carta.crisis ? "crisis" : "ronda", nombre: carta.titulo }];
   return { estado: s, resultado: detalle };
 }
 
@@ -368,6 +371,7 @@ export function resolverEvento(estado, evento) {
   detalle.misionesNuevas = m.nuevas;
   s = chequearFin(s);
   s.log = [...s.log, detalle];
+  s.hist = [...(estado.hist || []), { ...snapshot(s), tag: "evento", nombre: evento.titulo }];
   return { estado: s, resultado: detalle };
 }
 
@@ -387,6 +391,7 @@ export function resolverEventoMenor(estado, evento, opcionId = null) {
   detalle.misionesNuevas = m.nuevas;
   s = chequearFin(s);
   s.log = [...s.log, detalle];
+  s.hist = [...(estado.hist || []), { ...snapshot(s), tag: "menor", nombre: evento.titulo }];
   return { estado: s, resultado: detalle };
 }
 

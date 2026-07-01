@@ -1,13 +1,13 @@
 // ============================================================
 // screens.jsx — Pantallas completas
 // ============================================================
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ARQUETIPOS, INDICADORES, MISIONES } from "../data.js";
 import { tirarDados, resolverOpcion, resolverEvento, resolverEventoMenor, aplicarGolpe, esApuesta } from "../engine.js";
 import { getMeta } from "../meta.js";
 import { sfx } from "../sound.js";
-import { Dado, Efectos, Opcion } from "./ui.jsx";
-import { Confetti, ResumenRonda } from "./juice.jsx";
+import { Dado, Efectos, Opcion, useTilt } from "./ui.jsx";
+import { Confetti, Burst, ResumenRonda } from "./juice.jsx";
 
 // --- Etiqueta de concepto / clase ---
 export function ClaseTag({ clase, tema, personaje }) {
@@ -39,25 +39,52 @@ export function ConceptoBox({ texto }) {
 // ============================================================
 // INTRO
 // ============================================================
+const CAMPO = [
+  { e: "🌾", x: 5, dur: 19, del: 0, fs: 2.4 },
+  { e: "💰", x: 15, dur: 23, del: 4, fs: 1.8 },
+  { e: "🚜", x: 25, dur: 26, del: 9, fs: 2.2 },
+  { e: "🤝", x: 37, dur: 21, del: 2, fs: 1.7 },
+  { e: "📈", x: 47, dur: 24, del: 12, fs: 2.0 },
+  { e: "⚙️", x: 59, dur: 20, del: 6, fs: 1.8 },
+  { e: "🌱", x: 69, dur: 27, del: 10, fs: 2.2 },
+  { e: "🔥", x: 79, dur: 22, del: 3, fs: 1.7 },
+  { e: "🎲", x: 89, dur: 25, del: 8, fs: 2.1 },
+  { e: "🌾", x: 95, dur: 18, del: 14, fs: 1.6 },
+];
+
 export function Intro({ onComenzar }) {
   return (
     <div className="pantalla intro">
+      <div className="intro-campo" aria-hidden="true">
+        {CAMPO.map((c, i) => (
+          <span
+            key={i}
+            className="campo-e"
+            style={{ "--x": c.x + "%", "--dur": c.dur + "s", "--del": c.del + "s", "--fs": c.fs + "rem" }}
+          >
+            {c.e}
+          </span>
+        ))}
+      </div>
       <div className="intro-inner">
-        <div className="intro-kicker">Simulación organizacional</div>
-        <h1 className="intro-titulo">AgroSur <span className="intro-sa">S.A.</span></h1>
-        <div className="intro-sub">Crónicas del Cambio</div>
-        <p className="intro-lead">
+        <div className="intro-kicker reveal r1">Simulación organizacional</div>
+        <h1 className="intro-titulo reveal r2">AgroSur <span className="intro-sa">S.A.</span></h1>
+        <div className="intro-sub reveal r3">Crónicas del Cambio</div>
+        <p className="intro-lead reveal r4">
           Sos el nuevo <strong>Gerente de Transformación</strong> de una corredora de granos
           rosarina con 30 años de tradición. Durante <strong>13 rondas</strong> vas a decidir
           el rumbo de la empresa. <strong>Cada partida baraja un mazo distinto</strong>, y cada
           decisión pesa según el tipo de empresa que elijas. Al final, sabrás qué AgroSur
           construiste — y el Consultor te dirá por qué.
         </p>
-        <button className="btn btn-grande" onClick={() => { sfx.click(); onComenzar(); }}>Empezar ▸</button>
-        <div className="intro-pie">Organización y Gestión Empresaria · UAI Rosario</div>
-      </div>
-      <div className="intro-deco" aria-hidden="true">
-        {["💰","🤝","⚙️","🔥"].map((e,i) => <span key={i} className="deco-ind">{e}</span>)}
+        <div className="intro-badges reveal r5">
+          <span className="badge">🃏 13 rondas</span>
+          <span className="badge">🏢 6 empresas</span>
+          <span className="badge">🎲 2d6 · críticos ★</span>
+          <span className="badge">🏆 logros y récords</span>
+        </div>
+        <button className="btn btn-grande btn-brillo reveal r6" onClick={() => { sfx.click(); onComenzar(); }}>Empezar ▸</button>
+        <div className="intro-pie reveal r7">Organización y Gestión Empresaria · UAI Rosario</div>
       </div>
     </div>
   );
@@ -120,11 +147,12 @@ export function ModoSelect({ onElegir, onVolver }) {
 // ============================================================
 // SELECCIÓN DE ARQUETIPO
 // ============================================================
-export function ArquetipoCard({ arq, onElegir, ganado }) {
+export function ArquetipoCard({ arq, onElegir, ganado, indice = 0 }) {
   const orden = ["caja", "confianza", "adopcion", "motivacion"];
   const misiones = MISIONES[arq.id] || [];
+  const tiltRef = useTilt(8);
   return (
-    <button className="arq-card" onClick={() => onElegir(arq)}>
+    <button ref={tiltRef} className="arq-card" style={{ "--d": indice * 0.07 + "s" }} onClick={() => onElegir(arq)}>
       <div className="arq-head">
         <span className="arq-emoji">{arq.emoji}</span>
         <span className="arq-nombre">{arq.nombre}</span>
@@ -139,7 +167,7 @@ export function ArquetipoCard({ arq, onElegir, ganado }) {
           return (
             <div key={k} className="arq-stat">
               <span className="arq-stat-emoji">{ind.emoji}</span>
-              <div className="arq-mini-track"><div className="arq-mini-fill" style={{ width: v + "%", background: col }} /></div>
+              <div className="arq-mini-track"><div className="arq-mini-fill" style={{ width: v + "%", "--bc": col }} /></div>
               <span className="arq-stat-num" style={{ color: col }}>{v}</span>
             </div>
           );
@@ -172,10 +200,11 @@ export function ArquetipoSelect({ titulo, permitirAzar, onElegir, jugadorNum, mo
         />
       )}
       <div className="arq-grid">
-        {ARQUETIPOS.map((a) => (
+        {ARQUETIPOS.map((a, i) => (
           <ArquetipoCard
             key={a.id}
             arq={a}
+            indice={i}
             ganado={mostrarColeccion && meta.arquetiposGanados.includes(a.id)}
             onElegir={(arq) => { sfx.carta(); onElegir(arq.id, nombre); }}
           />
@@ -210,6 +239,8 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
   const [fase, setFase] = useState(conGolpe ? "entrada" : "elegir");
   const [pend, setPend] = useState(null); // {estado, detalle, opcion}
   const [confetti, setConfetti] = useState(0);
+  const [burst, setBurst] = useState(0);
+  const tiltRef = useTilt(3.5);
 
   function encajarGolpe() {
     const { estado: ns, deltas } = aplicarGolpe(estado, variante.efEntrada);
@@ -239,9 +270,12 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
 
   function dadoListo() {
     const d = pend.detalle.dado;
-    if (d.critico) { sfx.critico(); setConfetti((c) => c + 1); }
+    if (d.critico) { sfx.critico(); setConfetti((c) => c + 1); setBurst((b) => b + 1); }
     else if (d.pifia) sfx.pifia();
-    else if (d.exito) { sfx.diceExito(); if (pend.detalle.apuesta) setConfetti((c) => c + 1); }
+    else if (d.exito) {
+      sfx.diceExito();
+      if (pend.detalle.apuesta) { setConfetti((c) => c + 1); setBurst((b) => b + 1); }
+    }
     else if (d.casiExito) sfx.casiExito();
     else sfx.diceFracaso();
     if (pend.detalle.rachaRota) sfx.rachaRota();
@@ -250,6 +284,28 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
     setFase("resuelto");
   }
 
+  // Atajos de teclado: A/B/C (o 1/2/3) para elegir, Enter para continuar
+  useEffect(() => {
+    const handler = (e) => {
+      // BUTTON: Enter ya dispara el click nativo; evitamos el doble avance
+      if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (fase === "elegir") {
+        const idx = { a: 0, b: 1, c: 2, 1: 0, 2: 1, 3: 2 }[k];
+        if (idx != null && carta.opciones[idx]) elegir(carta.opciones[idx]);
+      } else if (fase === "resuelto" && (k === "enter" || k === " ")) {
+        e.preventDefault();
+        sfx.click();
+        onSiguiente();
+      } else if (fase === "entrada" && (k === "enter" || k === " ")) {
+        e.preventDefault();
+        encajarGolpe();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+
   const dadoDetalle = pend && pend.detalle.dado;
 
   return (
@@ -257,7 +313,8 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
       {confetti > 0 && <Confetti seed={confetti} />}
       {carta.crisis && <div className="crisis-ribbon">⚠️ CRISIS</div>}
       {variante && !carta.crisis && <div className="consecuencia-ribbon">{variante.ribbon}</div>}
-      <div className="carta">
+      <div className="carta carta-tilt" ref={tiltRef}>
+        {burst > 0 && <Burst seed={burst} />}
         {carta.crisis && variante && <div className="consecuencia-inline">{variante.ribbon}</div>}
         <ClaseTag clase={carta.clase} tema={carta.tema} personaje={carta.personaje} />
         <h2 className="carta-titulo">{carta.titulo}</h2>
@@ -278,8 +335,8 @@ export function RondaView({ estado, carta, onAplicar, onSiguiente }) {
 
         {fase === "elegir" && (
           <div className="opciones">
-            {carta.opciones.map((op) => (
-              <Opcion key={op.id} opcion={op} estado={estado} onElegir={elegir} />
+            {carta.opciones.map((op, i) => (
+              <Opcion key={op.id} opcion={op} estado={estado} onElegir={elegir} indice={i} />
             ))}
           </div>
         )}
@@ -351,6 +408,14 @@ export function EventoScreen({ estado, evento, onAplicar, onSiguiente }) {
       onSiguiente();
     }
   }
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON" || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); continuar(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
   return (
     <div className="ronda-view evento-view">
       <div className="evento-ribbon">⚡ EVENTO · {evento.severidad ? "impacto " + evento.severidad : "contexto"}</div>
@@ -384,6 +449,21 @@ export function EventoMenorScreen({ estado, evento, onAplicar, onSiguiente }) {
     setResultado(r);
   }
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (resultado && (k === "enter" || k === " ")) { e.preventDefault(); sfx.click(); onSiguiente(); }
+      else if (!resultado && !evento.binaria && (k === "enter" || k === " ")) { e.preventDefault(); resolver(); }
+      else if (!resultado && evento.binaria) {
+        const idx = { a: 0, b: 1, 1: 0, 2: 1 }[k];
+        if (idx != null && evento.binaria[idx]) resolver(evento.binaria[idx].id);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+
   return (
     <div className="ronda-view evento-view">
       <div className="evento-ribbon menor-ribbon">📰 TITULARES</div>
@@ -393,8 +473,8 @@ export function EventoMenorScreen({ estado, evento, onAplicar, onSiguiente }) {
 
         {!resultado && evento.binaria && (
           <div className="opciones">
-            {evento.binaria.map((op) => (
-              <button key={op.id} className="opcion" onClick={() => resolver(op.id)}>
+            {evento.binaria.map((op, i) => (
+              <button key={op.id} className="opcion" style={{ animationDelay: i * 0.08 + "s" }} onClick={() => resolver(op.id)}>
                 <div className="opcion-head">
                   <span className="opcion-letra">{op.id}</span>
                   <span className="opcion-texto">{op.texto}</span>

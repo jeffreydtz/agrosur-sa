@@ -326,8 +326,10 @@ export default function Juego() {
     if (subfase === "handoff") {
       contenido = <Handoff jugador={jugador} onListo={() => setSubfase("jugar")} />;
     } else {
+      // viñeta roja pulsante cuando un indicador vital está al borde del fin
+      const peligro = !estado.terminado && (estado.caja < 25 || estado.confianza < 25);
       contenido = (
-        <div className={"play-wrap " + (fx && fx.shake ? "shake" : "")}>
+        <div className={"play-wrap " + (fx && fx.shake ? "shake " : "") + (peligro ? "alerta-roja" : "")}>
           {esOnline && <OnlineHud room={roomSnap} playerId={online.playerId} onExpira={finalizar} />}
           <Tablero estado={estado} ronda={desc.label} totalRondas={TOTAL_RONDAS} etiqueta={etiqueta} fx={fx} />
           {paso.kind === "evento" ? (
@@ -405,6 +407,9 @@ export default function Juego() {
 
   return (
     <>
+      <div className="aurora" aria-hidden="true">
+        <span className="au au1" /><span className="au au2" /><span className="au au3" />
+      </div>
       <button className="mute-btn" onClick={onToggleMute} title={muted ? "Activar sonido" : "Silenciar"}>
         {muted ? "🔇" : "🔊"}
       </button>
